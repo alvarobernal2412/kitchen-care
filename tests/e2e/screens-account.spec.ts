@@ -109,6 +109,7 @@ test.describe('onboarding', () => {
 		await expect(page.getByText('Step 2 of 3')).toBeVisible();
 		await expect(bar.locator('i[data-on]')).toHaveCount(2);
 		await expect(page.getByRole('heading', { name: 'Your karma' })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Your karma' })).toBeFocused();
 		await expect(page.getByText(SLOGAN)).toHaveCount(0); // step 1 only
 		await expect(page.getByRole('button', { name: 'Back' })).toBeVisible();
 
@@ -123,10 +124,28 @@ test.describe('onboarding', () => {
 		await page.getByRole('button', { name: 'Next' }).click();
 		await expect(page.getByRole('button', { name: 'Next' })).toHaveCount(0);
 		await expect(page.getByRole('button', { name: 'Skip' })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'The semester prize' })).toBeFocused();
 		await expectNoOverflow(page);
 
-		await page.getByRole('button', { name: 'Get started' }).click();
+		// Keyboard only: Tab from the heading reaches Get started, Enter completes.
+		await page.keyboard.press('Tab');
+		await expect(page.getByRole('button', { name: 'Get started' })).toBeFocused();
+		await page.keyboard.press('Enter');
 		await expect(page).toHaveURL(`${E2E_ORIGIN}/`);
+	});
+
+	test('the first-run flow has no navigation but keeps the landmarks and skip link', async ({
+		page
+	}) => {
+		await signedIn(page, false);
+		await page.goto('/onboarding');
+		await expect(page.getByText('Step 1 of 3')).toBeVisible();
+		await expect(page.getByRole('navigation', { name: 'Main' })).toHaveCount(0);
+		await expect(page.getByRole('navigation')).toHaveCount(0);
+		await expect(page.locator('main#main')).toHaveCount(1);
+		await expect(page.getByRole('link', { name: 'Skip to content' })).toBeAttached();
+		const col = await page.locator('.page').boundingBox();
+		expect(col!.width).toBeLessThanOrEqual(26 * 16 + 1);
 	});
 
 	test('buttons are at least 44px tall and the page does not overflow at 360px', async ({
@@ -275,6 +294,26 @@ test.describe('signup', () => {
 		await expect(page.getByLabel('Student')).toBeAttached();
 		await expect(page.getByLabel('Employee')).toBeAttached();
 		await expectNoOverflow(page);
+	});
+
+	test('typing within one strength level does not touch the live region', async ({ page }) => {
+		await page.goto('/signup');
+		const live = page.getByTestId('password-meter').locator('[aria-live]');
+		await expect(live).toHaveAttribute('aria-atomic', 'true');
+		await page.getByLabel('Password').fill('a');
+		await expect(live).toContainText('Weak');
+		await live.evaluate((el) => {
+			(window as unknown as { muts: number }).muts = 0;
+			new MutationObserver((m) => ((window as unknown as { muts: number }).muts += m.length)).observe(
+				el,
+				{ subtree: true, childList: true, characterData: true }
+			);
+		});
+		await page.getByLabel('Password').pressSequentially('bcd'); // still Weak
+		await expect(page.getByLabel('Password')).toHaveValue('abcd');
+		expect(await page.evaluate(() => (window as unknown as { muts: number }).muts)).toBe(0);
+		await page.getByLabel('Password').fill('Abcdefg1!');
+		await expect(live).toContainText('Strong');
 	});
 
 	test('the password meter says it in words, lists what is missing and is not colour only', async ({

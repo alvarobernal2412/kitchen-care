@@ -87,6 +87,7 @@
 		<Segmented
 			name="classification"
 			ariaLabel="I am a"
+			describedby={err('classification')}
 			required
 			value={classification}
 			options={[

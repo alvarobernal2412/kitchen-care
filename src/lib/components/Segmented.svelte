@@ -13,6 +13,7 @@
 		name,
 		ariaLabel,
 		required = false,
+		describedby,
 		onchange
 	}: {
 		options: Option[];
@@ -20,6 +21,7 @@
 		name: string;
 		ariaLabel: string;
 		required?: boolean;
+		describedby?: string;
 		onchange?: (value: string) => void;
 	} = $props();
 
@@ -38,7 +40,7 @@
 		{/each}
 	</nav>
 {:else}
-	<div class="seg" role="radiogroup" aria-label={ariaLabel}>
+	<div class="seg" role="radiogroup" aria-label={ariaLabel} aria-describedby={describedby}>
 		{#each options as o (o.value)}
 			<label class="seg-item" class:active={o.value === value}>
 				<input

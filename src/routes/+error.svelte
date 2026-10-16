@@ -2,26 +2,11 @@
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 
+	import { errorCopy } from '$lib/errorCopy';
+
 	// Fixed copy per status. The error's own message is never shown: it can come from server code.
 	const status = $derived(page.status);
-	const copy = $derived.by(() => {
-		if (status === 404) {
-			return { title: "This page doesn't exist", text: 'The link may be old or mistyped. Home has everything.' };
-		}
-		if (status === 403) {
-			return { title: "You don't have access to this page.", text: 'It is meant for admins. Home has everything else.' };
-		}
-		if (status === 401) {
-			return { title: 'Please log in', text: 'You need to be logged in to see this page.' };
-		}
-		if (status >= 500) {
-			return {
-				title: 'Something went wrong on our side. Try again in a moment.',
-				text: 'Your credits are safe. If it keeps happening, tell an admin.'
-			};
-		}
-		return { title: "That request didn't work", text: 'Check the address and try again.' };
-	});
+	const copy = $derived(errorCopy(status));
 </script>
 
 <svelte:head><title>{copy.title}</title></svelte:head>
@@ -33,7 +18,7 @@
 	<p class="text">{copy.text}</p>
 	<div class="actions">
 		<a class="btn btn-primary" href={resolve('/')}>Go home</a>
-		{#if status === 401}<a class="btn btn-quiet" href={resolve('/login')}>Log in</a>{/if}
+		{#if copy.offerLogin}<a class="btn btn-quiet" href={resolve('/login')}>Log in</a>{/if}
 	</div>
 </main>
 

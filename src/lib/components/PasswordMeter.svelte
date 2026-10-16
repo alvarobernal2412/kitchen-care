@@ -22,7 +22,8 @@
 			<i class:on={i < filled}></i>
 		{/each}
 	</div>
-	<p class="strength" aria-live="polite">
+	<!-- The text only changes when the level flips (Weak / Almost there / Strong), so typing within a level is silent. -->
+	<p class="strength" aria-live="polite" aria-atomic="true">
 		{#if password !== ''}Password strength: <strong>{label}</strong>{/if}
 	</p>
 	{#if result.missing.length}
