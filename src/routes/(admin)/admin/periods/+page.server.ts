@@ -4,6 +4,7 @@ import { requireAdmin } from '$lib/server/auth/session';
 import { getDb } from '$lib/server/db';
 import {
 	ActivePeriodExistsError,
+	countPendingInPeriod,
 	PeriodNotActiveError,
 	createPeriod,
 	endPeriod,
@@ -26,13 +27,15 @@ export const load: PageServerLoad = async ({ locals }) => {
 	const db = getDb();
 	const [active, past] = await Promise.all([getActivePeriod(db), listPastPeriods(db)]);
 	const standings = active ? await getLeaderboard(db, active.id) : [];
+	const pending = active ? await countPendingInPeriod(db, active.id) : 0;
 	return {
 		active: active
 			? {
 					id: active.id,
 					name: active.name,
 					startsAt: active.startsAt.toISOString(),
-					participants: standings.length
+					participants: standings.length,
+					pending
 				}
 			: null,
 		past: past.map((p) => ({

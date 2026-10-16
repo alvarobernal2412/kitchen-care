@@ -27,6 +27,13 @@
 			Started {day(data.active.startsAt)} &middot; {data.active.participants} scoring
 			{data.active.participants === 1 ? 'participant' : 'participants'}
 		</p>
+		{#if data.active.pending > 0}
+			<p class="warn" role="status">
+				{data.active.pending}
+				{data.active.pending === 1 ? 'submission' : 'submissions'} still pending review — they can
+				only be rejected after the period ends.
+			</p>
+		{/if}
 		<form method="POST" action="?/end" use:enhance>
 			<input type="hidden" name="periodId" value={data.active.id} />
 			<label class="confirm">
@@ -121,6 +128,12 @@
 		padding: 0.6rem 0.8rem;
 		color: #166534;
 		background: #dcfce7;
+		border-radius: 8px;
+	}
+	.warn {
+		padding: 0.6rem 0.8rem;
+		color: #92400e;
+		background: #fef3c7;
 		border-radius: 8px;
 	}
 	.error {
