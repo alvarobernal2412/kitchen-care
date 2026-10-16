@@ -11,6 +11,7 @@
 		<a href={resolve('/admin/users')}>Users</a>
 		<a href={resolve('/admin/moderation')}>Moderation</a>
 		<a href={resolve('/admin/images')}>Images</a>
+		<a href={resolve('/admin/analytics')}>Analytics</a>
 		<a href={resolve('/admin/review')}>
 			Review{#if data.pendingCount > 0}<span class="badge">{data.pendingCount}</span>{/if}
 		</a>

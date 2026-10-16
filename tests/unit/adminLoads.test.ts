@@ -20,7 +20,8 @@ const cases = [
 	['periods', () => import('../../src/routes/(admin)/admin/periods/+page.server')],
 	['users', () => import('../../src/routes/(admin)/admin/users/+page.server')],
 	['moderation', () => import('../../src/routes/(admin)/admin/moderation/+page.server')],
-	['images', () => import('../../src/routes/(admin)/admin/images/+page.server')]
+	['images', () => import('../../src/routes/(admin)/admin/images/+page.server')],
+	['analytics', () => import('../../src/routes/(admin)/admin/analytics/+page.server')]
 ] as const;
 
 describe('admin page loads', () => {
