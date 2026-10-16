@@ -44,3 +44,8 @@ start a fresh one.
 The service worker and manifest are active in production builds. On Android Chrome use
 "Install app"; on iOS Safari use Share, then "Add to Home Screen". Icons are regenerated with
 `node scripts/generate-icons.mjs`.
+
+## Deployment
+
+Production runs as a Docker stack behind an existing Nginx Proxy Manager on a VPS, deployed by
+GitHub Actions on push to `main` with a blue/green switch. See `deploy/README.md` for the runbook.
