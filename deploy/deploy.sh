@@ -15,6 +15,7 @@ cd "$(dirname "$0")/.."
 . ./deploy/lib.sh
 
 valid_tag "$TAG" || { echo "invalid or reserved image tag" >&2; exit 2; }
+require_flock
 validate_env
 docker image inspect "kitchen-care-app:$TAG" >/dev/null 2>&1 || die "image kitchen-care-app:$TAG does not exist on this host (build it with deploy/update.sh)"
 with_lock

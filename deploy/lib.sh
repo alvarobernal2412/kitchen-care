@@ -62,41 +62,43 @@ validate_env() {
 	[ "$(printf '%s' "$(env_val SESSION_SECRET)" | wc -c)" -ge 32 ] || die "SESSION_SECRET must be at least 32 characters"
 	[ -z "$(env_val BODY_SIZE_LIMIT)" ] || die "do not set BODY_SIZE_LIMIT in .env; the stack fixes it at 6M"
 
+	# The compose project name selects the volumes (data!). Production is "kitchen-care"; the local
+	# override file is the only thing allowed to use "kitchen-care-local", and only together.
+	_proj=$(env_val COMPOSE_PROJECT_NAME)
+	case $(env_val COMPOSE_FILE) in
+		*compose.local.yml*) [ "$_proj" = kitchen-care-local ] || die "the local override (compose.local.yml) needs COMPOSE_PROJECT_NAME=kitchen-care-local" ;;
+		*) case $_proj in '' | kitchen-care) ;; *) die "COMPOSE_PROJECT_NAME must be unset or kitchen-care (got '$_proj'): it selects the data volumes" ;; esac ;;
+	esac
+
 	NPM_NETWORK=$(env_val NPM_NETWORK)
 	docker network inspect "$NPM_NETWORK" >/dev/null 2>&1 ||
 		die "docker network '$NPM_NETWORK' (NPM_NETWORK) does not exist. Find NPM's network with: docker network ls; docker inspect <npm container> --format '{{json .NetworkSettings.Networks}}'"
 }
 
-# mem_available_mb: available host memory in MB (MemAvailable), empty when it cannot be read.
-mem_available_mb() {
-	if [ -r /proc/meminfo ] && grep -q '^MemAvailable:' /proc/meminfo 2>/dev/null; then
-		awk '/^MemAvailable:/ {printf "%d", $2 / 1024}' /proc/meminfo
-	elif command -v free >/dev/null 2>&1; then
-		free -m | awk '/^Mem:/ {print $7}'
+# _mem_guard MIN NAME HINT: refuse when MemAvailable is below MIN MB. Fails closed on Linux: if the
+# meminfo file exists but MemAvailable cannot be read, refuse. Without the file (a non-Linux dev
+# machine) warn and skip. MEMINFO_FILE overrides /proc/meminfo (tests).
+_mem_guard() {
+	_file=${MEMINFO_FILE:-/proc/meminfo}
+	if [ ! -e "$_file" ]; then
+		warn "$_file not found (not Linux?); skipping the memory guard"
+		return 0
 	fi
+	_avail=$(awk '/^MemAvailable:/ {printf "%d", $2 / 1024}' "$_file" 2>/dev/null || true)
+	case $_avail in '' | *[!0-9]*) die "cannot read MemAvailable from $_file; refusing to continue" ;; esac
+	[ "$_avail" -ge "$1" ] || die "only ${_avail} MB memory available (< $2=$1); $3"
 }
 
 # check_free_memory: the host is shared and small; two app colours briefly run side by side, so
-# refuse to start when less than MIN_FREE_MB (default 400) is available. Skipped when unreadable.
+# refuse to start when less than MIN_FREE_MB (default 400) is available.
 check_free_memory() {
-	_min=$(env_num MIN_FREE_MB 400)
-	_avail=$(mem_available_mb)
-	case $_avail in '' | *[!0-9]*) return 0 ;; esac
-	[ "$_avail" -ge "$_min" ] || die "only ${_avail} MB memory available (< MIN_FREE_MB=$_min); not starting a second app container. Free memory or lower MIN_FREE_MB."
+	_mem_guard "$(env_num MIN_FREE_MB 400)" MIN_FREE_MB "not starting a second app container. Free memory or lower MIN_FREE_MB."
 }
 
 # check_build_memory: building the image on the VPS needs headroom; refuse below MIN_BUILD_FREE_MB
-# (default 900) so the Vite build cannot starve the other apps. Skipped when unreadable.
+# (default 900) so the build cannot starve the other apps.
 check_build_memory() {
-	_min=$(env_num MIN_BUILD_FREE_MB 900)
-	_avail=$(mem_available_mb)
-	case $_avail in
-		'' | *[!0-9]*)
-			warn "cannot read available memory; skipping the build memory guard"
-			return 0
-			;;
-	esac
-	[ "$_avail" -ge "$_min" ] || die "only ${_avail} MB memory available (< MIN_BUILD_FREE_MB=$_min); not building now. Retry later, stop something, or lower MIN_BUILD_FREE_MB in .env."
+	_mem_guard "$(env_num MIN_BUILD_FREE_MB 900)" MIN_BUILD_FREE_MB "not building now. Retry later, stop something, or lower MIN_BUILD_FREE_MB in .env."
 }
 
 valid_cidr() {
@@ -269,8 +271,7 @@ switch_traffic() {
 # --- locking, signals, logging -------------------------------------------------------------
 
 LOCK_FILE=$STATE_DIR/.lock
-LOCK_OWNER=""       # pid if this process created the lock file (and so removes it)
-HAVE_LOCK=0         # 1 once this run is entitled to act (owner, re-entry, or told child)
+HAVE_LOCK=0         # 1 once this run is entitled to act (holder, re-exec, or the holder's child)
 SWITCH_ACTIVE=0
 SWITCH_DONE=0
 SWITCH_OLD=""
@@ -295,7 +296,6 @@ cleanup() {
 	# A run that never got the lock (refused, or interrupted while waiting) must not touch anything:
 	# the nginx files, colours and state belong to whoever holds the lock.
 	if [ "$HAVE_LOCK" != 1 ]; then
-		rm -f "$LOCK_FILE.$$"
 		return 0
 	fi
 	if [ -n "$CHILD_PID" ]; then
@@ -316,85 +316,64 @@ cleanup() {
 		[ -z "$PENDING_REMOVE" ] || docker compose rm -sf "kitchen-care-app-$PENDING_REMOVE" >/dev/null 2>&1 || true
 		[ -z "$PENDING_STOP" ] || docker compose stop "kitchen-care-app-$PENDING_STOP" >/dev/null 2>&1 || true
 	fi
-	rm -f "$LOCK_FILE.$$"
-	# Only remove a lock this process owns.
-	if [ -n "$LOCK_OWNER" ] && [ "$(lock_pid)" = "$LOCK_OWNER" ]; then
-		rm -f "$LOCK_FILE"
-	fi
+	# The flock is released by the kernel when this process exits; the lock file is never removed.
 	if [ -n "$TAIL_PID" ]; then
 		sleep 1 # let the follower print the last lines
 		kill "$TAIL_PID" 2>/dev/null || true
 	fi
 }
 
-lock_pid() { sed -n '1p' "$LOCK_FILE" 2>/dev/null || true; }
 
-# with_lock: take the deploy lock, a file "pid / start time" that is created complete and
-# atomically (written to a temp name, then hard-linked into place, which fails if it exists), so
-# there is never a lock without a pid. A lock whose pid is dead is stale; contenders recover it
-# one at a time through a "takeover" link and re-check the lock under it, so two of them can never
-# both remove it and both proceed. Exits 75 when a live deploy holds the lock.
-# The lock is re-entrant for the process that holds it (update.sh re-executes itself) and for the
-# direct child of the holder that was told so (KC_LOCK_PARENT, set by update.sh for deploy.sh).
+# require_flock: the lock is flock(1) (util-linux); fail early and clearly without it.
+require_flock() {
+	command -v flock >/dev/null 2>&1 || die "flock is not installed (package util-linux); the deploy lock needs it"
+}
+
+# lock_is_held: true when some open file description holds the lock right now.
+lock_is_held() {
+	(
+		exec 8>>"$LOCK_FILE" || exit 1
+		! flock -n 8
+	) 2>/dev/null
+}
+
+# with_lock: take the deploy lock, shared by update.sh, deploy.sh and rollback.sh. It is flock(1)
+# on state/.lock: tied to the file's inode, so it works across PID namespaces (the runner
+# container and manual runs on the host share state/ through a bind mount) and dies with its holder
+# (no stale-lock recovery needed). The file content (pid, start time) is only a diagnostic and may
+# come from another container. Exits 75 when someone else holds the lock.
+# The lock lives on fd 9, which children and `exec` inherit (so it must not be handed to
+# long-lived background processes: start_logging closes it for its follower). Hand-off: the holder
+# exports KC_LOCK_HOLDER=<its pid>; update.sh's re-exec (same pid) and its direct deploy.sh child
+# (PPID) are accepted only if that marker matches AND the lock is verifiably held by someone.
 # Also installs the signal handling for the rest of the run: INT/TERM clean up and exit (the
 # deploy never continues), HUP/PIPE are ignored so a dropped session does not abort a half-finished
 # switch.
 with_lock() {
+	require_flock
 	mkdir -p "$STATE_DIR"
 	trap cleanup EXIT
 	trap 'exit 130' INT
 	trap 'exit 143' TERM
 	trap '' HUP PIPE
 
-	_held=$(lock_pid)
-	if [ -n "$_held" ]; then
-		if [ "$_held" = "$$" ]; then
-			LOCK_OWNER=$$
+	if [ -n "${KC_LOCK_HOLDER:-}" ] && { [ "$KC_LOCK_HOLDER" = "$$" ] || [ "$KC_LOCK_HOLDER" = "$PPID" ]; }; then
+		if lock_is_held; then
 			HAVE_LOCK=1
 			return 0
 		fi
-		if [ "${KC_LOCK_PARENT:-}" = "$_held" ] && [ "$_held" = "$PPID" ]; then
-			HAVE_LOCK=1
-			return 0
-		fi
+		die "KC_LOCK_HOLDER is set but nobody holds the lock; refusing to continue"
 	fi
 
-	_tmp="$LOCK_FILE.$$"
-	printf '%s\n%s\n' "$$" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >"$_tmp"
-	_tries=0
-	while :; do
-		if ln "$_tmp" "$LOCK_FILE" 2>/dev/null; then
-			rm -f "$_tmp"
-			LOCK_OWNER=$$
-			HAVE_LOCK=1
-			return 0
-		fi
-		_pid=$(lock_pid)
-		if [ -n "$_pid" ] && kill -0 "$_pid" 2>/dev/null; then
-			rm -f "$_tmp"
-			printf '%s\n' "deploy: ERROR: another deploy is running (pid $_pid, started $(sed -n '2p' "$LOCK_FILE" 2>/dev/null || echo unknown))" >&2
-			exit 75
-		fi
-		if [ -n "$_pid" ]; then
-			if ln "$_tmp" "$LOCK_FILE.takeover" 2>/dev/null; then
-				if [ "$(lock_pid)" = "$_pid" ]; then
-					log "removing stale lock (pid $_pid is not running)"
-					rm -f "$LOCK_FILE"
-				fi
-				rm -f "$LOCK_FILE.takeover"
-			else
-				# Someone else is recovering; if that contender died mid-way, clear its marker.
-				_tp=$(sed -n '1p' "$LOCK_FILE.takeover" 2>/dev/null || true)
-				if [ -n "$_tp" ] && ! kill -0 "$_tp" 2>/dev/null; then rm -f "$LOCK_FILE.takeover"; fi
-				sleep 1
-			fi
-		fi
-		_tries=$((_tries + 1))
-		if [ "$_tries" -ge 15 ]; then
-			rm -f "$_tmp"
-			die "could not take the deploy lock"
-		fi
-	done
+	exec 9>>"$LOCK_FILE" || die "cannot open $LOCK_FILE"
+	if ! flock -n 9; then
+		printf '%s\n' "deploy: ERROR: another deploy is running (pid $(sed -n '1p' "$LOCK_FILE" 2>/dev/null || echo ?), started $(sed -n '2p' "$LOCK_FILE" 2>/dev/null || echo unknown); the pid may belong to another container)" >&2
+		exit 75
+	fi
+	printf '%s\n%s\n' "$$" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >"$LOCK_FILE"
+	KC_LOCK_HOLDER=$$
+	export KC_LOCK_HOLDER
+	HAVE_LOCK=1
 }
 
 # start_logging [NAME]: from here on all output goes to state/NAME.log (default deploy.log) and is
@@ -408,7 +387,7 @@ start_logging() {
 	if [ -f "$_log" ] && [ "$(wc -c <"$_log")" -gt 1048576 ]; then : >"$_log"; fi
 	: >>"$_log"
 	_off=$(wc -c <"$_log")
-	tail -c "+$((_off + 1))" -f "$_log" &
+	tail -c "+$((_off + 1))" -f "$_log" 9>&- &
 	TAIL_PID=$!
 	exec >>"$_log" 2>&1
 	log "---- $(date -u +%Y-%m-%dT%H:%M:%SZ) pid $$ ----"

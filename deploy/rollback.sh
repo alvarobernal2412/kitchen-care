@@ -8,6 +8,7 @@ cd "$(dirname "$0")/.."
 # shellcheck source=deploy/lib.sh
 . ./deploy/lib.sh
 
+require_flock
 validate_env
 with_lock
 start_logging
