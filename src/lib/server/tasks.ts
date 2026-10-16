@@ -1,7 +1,6 @@
 import { and, desc, eq, ne, sql } from 'drizzle-orm';
 import type { Db } from './db';
-import { events, submissions, tasks, users } from './db/schema';
-import { getActivePeriod } from './periods';
+import { events, periods, submissions, tasks, users } from './db/schema';
 
 export type Submission = typeof submissions.$inferSelect;
 export type Task = typeof tasks.$inferSelect;
@@ -72,7 +71,15 @@ export async function creditAutoApprovedTask(
 		const [user] = await tx.select({ active: users.active }).from(users).where(eq(users.id, userId));
 		if (!user?.active) throw new InactiveUserError();
 
-		const period = await getActivePeriod(tx as unknown as Db);
+		// FOR SHARE blocks a concurrent UPDATE of the period row (e.g. Task 6's endPeriod, which
+		// must UPDATE the row) until we commit, and if that UPDATE wins first, READ COMMITTED
+		// re-checks status = 'active' and we get no row. Credits never land in an ended period.
+		const [period] = await tx
+			.select()
+			.from(periods)
+			.where(eq(periods.status, 'active'))
+			.limit(1)
+			.for('share');
 		if (!period) throw new NoActivePeriodError();
 
 		const [last] = await tx

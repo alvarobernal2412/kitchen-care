@@ -121,6 +121,31 @@ describe('logTask', () => {
 		expect(s.status).toBe('approved');
 	});
 
+	it('never credits into a period that is being ended concurrently', async () => {
+		const [active] = await t.db.select().from(periods);
+		let release!: () => void;
+		const gate = new Promise<void>((r) => (release = r));
+		let started!: () => void;
+		const updated = new Promise<void>((r) => (started = r));
+		const ending = t.db.transaction(async (tx) => {
+			await tx.update(periods).set({ status: 'ended', endsAt: new Date() }).where(eq(periods.id, active.id));
+			started();
+			await gate;
+		});
+		await updated;
+		const logging = logTask(t.db, u1, 'dishwasher', { now: T0 }).then(
+			() => null,
+			(e) => e
+		);
+		// The log must be blocked on the period row while the end is uncommitted.
+		const early = await Promise.race([logging, new Promise((r) => setTimeout(() => r('pending'), 300))]);
+		expect(early).toBe('pending');
+		release();
+		await ending;
+		expect(await logging).toBeInstanceOf(NoActivePeriodError);
+		expect(await t.db.select().from(submissions)).toHaveLength(0);
+	});
+
 	it('rejects inactive users', async () => {
 		const u3 = await mkUser('gone', false);
 		await expect(logTask(t.db, u3, 'dishwasher')).rejects.toBeInstanceOf(InactiveUserError);
