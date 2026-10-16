@@ -21,7 +21,8 @@ const endSchema = z.object({
 	confirm: z.literal('yes', { error: 'Tick the box to confirm ending the period' })
 });
 
-export const load: PageServerLoad = async () => {
+export const load: PageServerLoad = async ({ locals }) => {
+	requireAdmin(locals); // layout loads are skipped on client-side navigation
 	const db = getDb();
 	const [active, past] = await Promise.all([getActivePeriod(db), listPastPeriods(db)]);
 	const standings = active ? await getLeaderboard(db, active.id) : [];

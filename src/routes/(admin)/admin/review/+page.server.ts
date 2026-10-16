@@ -28,7 +28,8 @@ const rejectSchema = z.object({
 	note: z.string().trim().max(150, 'Note is too long (150 characters max)').default('')
 });
 
-export const load: PageServerLoad = async () => {
+export const load: PageServerLoad = async ({ locals }) => {
+	requireAdmin(locals); // layout loads are skipped on client-side navigation
 	const pending = await listPending(getDb());
 	return {
 		reasons: [...REASONS],
