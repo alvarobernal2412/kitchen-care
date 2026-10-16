@@ -3,6 +3,10 @@ import postgres from 'postgres';
 import * as schema from './schema';
 
 export type Db = PostgresJsDatabase<typeof schema>;
+/** What `db.transaction(async (tx) => ...)` hands you. */
+export type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
+/** The query surface shared by a `Db` and a `Tx`; accept this to run inside or outside a transaction. */
+export type Executor = Pick<Db, 'select' | 'insert' | 'update' | 'delete'>;
 
 export function createDb(url: string): { db: Db; client: postgres.Sql } {
 	const client = postgres(url);

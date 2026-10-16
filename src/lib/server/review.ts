@@ -1,6 +1,6 @@
 import { asc, eq } from 'drizzle-orm';
 import { z } from 'zod';
-import type { Db } from './db';
+import type { Db, Tx } from './db';
 import { deleteUpload } from './images';
 import { periods, submissions, tasks, users } from './db/schema';
 import type { Submission } from './tasks';
@@ -37,11 +37,9 @@ export const REJECT_REASON_MAX = 200;
 const reasonSchema = z.string().trim().min(1).max(REJECT_REASON_MAX);
 
 export type ApproveOptions = {
-	onMilestone?: (submission: Submission, tx: Db) => Promise<void>;
+	onMilestone?: (submission: Submission, tx: Tx) => Promise<void>;
 	now?: Date;
 };
-
-type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 
 async function assertAdmin(tx: Pick<Db, 'select'>, adminId: number) {
 	const [a] = await tx
@@ -92,7 +90,7 @@ export async function approve(
 			.where(eq(submissions.id, sub.id))
 			.returning();
 
-		if (task.milestone && opts.onMilestone) await opts.onMilestone(updated, tx as unknown as Db);
+		if (task.milestone && opts.onMilestone) await opts.onMilestone(updated, tx);
 	});
 }
 
