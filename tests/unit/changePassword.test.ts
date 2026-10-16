@@ -4,6 +4,7 @@ import { getTestDb, type TestDb } from '../helpers/testDb';
 import { sessions, users } from '../../src/lib/server/db/schema';
 import { AuthError, signUp } from '../../src/lib/server/auth/users';
 import { changePassword } from '../../src/lib/server/auth/account';
+import { createResetToken, consumeResetToken, ResetError } from '../../src/lib/server/auth/reset';
 import { getSessionUser, login } from '../../src/lib/server/auth/session';
 
 const OLD = 'Abcdef1!';
@@ -68,5 +69,19 @@ describe('changePassword', () => {
 		expect(await getSessionUser(t.db, b.current)).not.toBeNull();
 		const rows = await t.db.select().from(sessions).where(eq(sessions.userId, b.u.id));
 		expect(rows).toHaveLength(2);
+	});
+
+	it('invalidates outstanding reset links', async () => {
+		const admin = await signUp(t.db, { username: 'cp-admin', password: OLD, classification: 'Student' });
+		await t.db.update(users).set({ role: 'admin' }).where(eq(users.id, admin.id));
+		const { u, current } = await newUser('cp-reset');
+		const token = await createResetToken(t.db, admin.id, u.id);
+		await changePassword(t.db, u.id, OLD, NEW, current);
+		const err = await consumeResetToken(t.db, token, 'Another1Pass!').then(
+			() => null,
+			(e) => e
+		);
+		expect(err).toBeInstanceOf(ResetError);
+		await expect(login(t.db, 'cp-reset', NEW)).resolves.toBeDefined();
 	});
 });
