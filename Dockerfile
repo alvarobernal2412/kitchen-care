@@ -18,6 +18,7 @@ RUN npm ci --omit=dev
 
 # --- runtime ---------------------------------------------------------------------------------
 FROM node:${NODE_VERSION}-bookworm-slim AS runtime
+LABEL com.kitchen-care.project="kitchen-care"
 ENV NODE_ENV=production \
     HOST=0.0.0.0 \
     PORT=3000 \

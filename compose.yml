@@ -62,12 +62,14 @@ services:
       timeout: 3s
       retries: 5
 
-  # Blue and green run the same app from two image tags that deploy.sh maintains.
-  app-blue:
+  # Blue and green run the same app from two image tags that deploy.sh maintains. The service
+  # names carry the prefix because they are the DNS names the proxy uses (private network only:
+  # the app is never attached to the shared NPM network, so no generic name like app-blue exists).
+  kitchen-care-app-blue:
     <<: *app
     image: kitchen-care-app:blue
 
-  app-green:
+  kitchen-care-app-green:
     <<: *app
     image: kitchen-care-app:green
 
@@ -75,6 +77,7 @@ services:
   migrate:
     image: kitchen-care-app:next
     profiles: [tools]
+    mem_limit: 256m
     networks: [internal]
     logging: *logging
     depends_on:

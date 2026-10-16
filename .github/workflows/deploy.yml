@@ -74,7 +74,7 @@ jobs:
           set -eu
           mkdir -p "$RUNNER_TEMP/stream/bundle"
           gzip -c "$RUNNER_TEMP/image.tar" > "$RUNNER_TEMP/stream/image.tar.gz"
-          cp compose.yml compose.hostport.yml "$RUNNER_TEMP/stream/bundle/"
+          cp compose.yml "$RUNNER_TEMP/stream/bundle/"
           cp -r deploy "$RUNNER_TEMP/stream/bundle/deploy"
           rm -rf "$RUNNER_TEMP/stream/bundle/deploy/local"
           tar -C "$RUNNER_TEMP/stream" -cf "$RUNNER_TEMP/stream.tar" image.tar.gz bundle
