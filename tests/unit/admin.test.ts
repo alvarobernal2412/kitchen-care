@@ -29,6 +29,7 @@ import {
 	SelfChangeError,
 	UserNotFoundError,
 	deletePeriodImages,
+	listProofImages,
 	searchUsers,
 	setActive,
 	setRole
@@ -331,5 +332,47 @@ describe('deletePeriodImages', () => {
 		const kept = await subOf(s2.id);
 		expect(kept.imagePath).toBe(f2);
 		expect(kept.imageRemovedAt).toBeNull();
+	});
+});
+
+describe('listProofImages', () => {
+	it('lists only submissions with images, filtered and paged newest first', async () => {
+		const alice = await mk('imgalice');
+		const bob = await mk('imgbob');
+		const [p] = await t.db
+			.insert(periods)
+			.values({ name: 'imgp', startsAt: new Date(), endsAt: new Date(), status: 'ended' })
+			.returning();
+		const ids: number[] = [];
+		for (let i = 0; i < 5; i++) {
+			const [s] = await t.db
+				.insert(submissions)
+				.values({
+					userId: i % 2 ? bob : alice,
+					taskKey: i < 3 ? 'dishwasher' : 'milk',
+					periodId: p.id,
+					status: 'pending',
+					imagePath: `${randomBytes(16).toString('hex')}.webp`
+				})
+				.returning();
+			ids.push(s.id);
+		}
+		await t.db.insert(submissions).values({
+			userId: alice, taskKey: 'milk', periodId: p.id, status: 'approved'
+		}); // no image: excluded
+
+		const all = await listProofImages(t.db, { periodId: p.id });
+		expect(all.items.map((i) => i.id)).toEqual([...ids].reverse());
+		expect(all.next).toBeNull();
+		expect(all.items[0]).toMatchObject({ periodName: 'imgp', status: 'pending' });
+
+		const first = await listProofImages(t.db, { periodId: p.id, limit: 2 });
+		expect(first.items).toHaveLength(2);
+		const second = await listProofImages(t.db, { periodId: p.id, limit: 2, beforeId: first.next! });
+		expect(second.items.map((i) => i.id)).toEqual([ids[2], ids[1]]);
+
+		expect((await listProofImages(t.db, { periodId: p.id, taskKey: 'milk' })).items).toHaveLength(2);
+		expect((await listProofImages(t.db, { periodId: p.id, user: 'IMGBOB' })).items).toHaveLength(2);
+		expect((await listProofImages(t.db, { periodId: p.id, user: 'img%' })).items).toHaveLength(0);
 	});
 });

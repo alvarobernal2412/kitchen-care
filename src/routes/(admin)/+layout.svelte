@@ -8,6 +8,9 @@
 	<a class="brand" href={resolve('/')}>Kitchen Care Credits</a>
 	<nav>
 		<a href={resolve('/admin/periods')}>Periods</a>
+		<a href={resolve('/admin/users')}>Users</a>
+		<a href={resolve('/admin/moderation')}>Moderation</a>
+		<a href={resolve('/admin/images')}>Images</a>
 		<a href={resolve('/admin/review')}>
 			Review{#if data.pendingCount > 0}<span class="badge">{data.pendingCount}</span>{/if}
 		</a>

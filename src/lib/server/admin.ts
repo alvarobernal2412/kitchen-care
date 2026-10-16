@@ -1,6 +1,6 @@
-import { and, asc, eq, gt, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lt, or, sql, type SQL } from 'drizzle-orm';
 import type { Db, Tx } from './db';
-import { periods, posts, resetTokens, submissions, users } from './db/schema';
+import { periods, posts, resetTokens, submissions, tasks, users } from './db/schema';
 import { revokeUserSessions } from './auth/session';
 import { deleteUpload } from './images';
 import { NotAdminError } from './review';
@@ -45,6 +45,11 @@ export type AdminUserRow = {
 	points: number;
 };
 
+/** Lower-cased, trimmed search text with LIKE wildcards (and the escape character) made literal. */
+function escapeLike(q: string): string {
+	return q.trim().toLowerCase().replace(/[\\%_]/g, '\\$&');
+}
+
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
 
@@ -56,7 +61,7 @@ export async function searchUsers(
 ): Promise<AdminUserRow[]> {
 	const asked = Number.isFinite(opts.limit) ? Math.trunc(opts.limit!) : DEFAULT_LIMIT;
 	const limit = Math.min(Math.max(asked, 1), MAX_LIMIT);
-	const needle = q.trim().toLowerCase().replace(/[\\%_]/g, '\\$&');
+	const needle = escapeLike(q);
 	const [active] = await db
 		.select({ id: periods.id })
 		.from(periods)
@@ -150,6 +155,71 @@ export async function setActive(
 				.where(and(eq(resetTokens.userId, userId), isNull(resetTokens.usedAt)));
 		}
 	});
+}
+
+// ---------------------------------------------------------------- image explorer
+
+export type ProofImageRow = {
+	id: number;
+	imagePath: string;
+	status: 'pending' | 'approved' | 'rejected';
+	createdAt: Date;
+	taskKey: string;
+	taskLabel: string;
+	username: string;
+	periodId: number | null;
+	periodName: string | null;
+};
+
+export type ProofImageFilter = {
+	taskKey?: string;
+	/** Case-insensitive username substring. */
+	user?: string;
+	periodId?: number;
+	/** Keyset cursor: only submissions with a smaller id (ids grow with creation time). */
+	beforeId?: number;
+	limit?: number;
+};
+
+export const IMAGE_PAGE_SIZE = 24;
+
+/** Submissions that still have a stored proof image, newest first. */
+export async function listProofImages(
+	db: Db,
+	filter: ProofImageFilter = {}
+): Promise<{ items: ProofImageRow[]; next: number | null }> {
+	const limit = Math.min(Math.max(Math.trunc(filter.limit ?? IMAGE_PAGE_SIZE), 1), MAX_LIMIT);
+	const conds: SQL[] = [isNotNull(submissions.imagePath)];
+	if (filter.taskKey) conds.push(eq(submissions.taskKey, filter.taskKey));
+	if (filter.periodId !== undefined) conds.push(eq(submissions.periodId, filter.periodId));
+	if (filter.beforeId !== undefined) conds.push(lt(submissions.id, filter.beforeId));
+	const needle = filter.user ? escapeLike(filter.user) : '';
+	if (needle) conds.push(sql`${users.usernameNormalized} like ${'%' + needle + '%'}`);
+
+	const rows = await db
+		.select({
+			id: submissions.id,
+			imagePath: submissions.imagePath,
+			status: submissions.status,
+			createdAt: submissions.createdAt,
+			taskKey: submissions.taskKey,
+			taskLabel: tasks.label,
+			username: users.displayUsername,
+			periodId: submissions.periodId,
+			periodName: periods.name
+		})
+		.from(submissions)
+		.innerJoin(users, eq(users.id, submissions.userId))
+		.innerJoin(tasks, eq(tasks.key, submissions.taskKey))
+		.leftJoin(periods, eq(periods.id, submissions.periodId))
+		.where(and(...conds))
+		.orderBy(desc(submissions.id))
+		.limit(limit + 1);
+	const page = rows.slice(0, limit);
+	return {
+		items: page.map((r) => ({ ...r, imagePath: r.imagePath! })),
+		next: rows.length > limit ? page[page.length - 1].id : null
+	};
 }
 
 // ---------------------------------------------------------------- image retention
