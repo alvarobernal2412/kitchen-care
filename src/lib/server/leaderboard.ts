@@ -1,0 +1,62 @@
+import { and, asc, desc, eq, or, sql, type SQL } from 'drizzle-orm';
+import type { Db } from './db';
+import { periods, submissions, users } from './db/schema';
+
+export type LeaderboardFilter = {
+	classification?: 'Student' | 'Employee';
+	department?: string;
+};
+
+export type LeaderboardRow = {
+	userId: number;
+	username: string;
+	avatar: string | null;
+	points: number;
+	rank: number;
+};
+
+/**
+ * Standings for a period: approved points only, users with 0 points omitted, ties share a
+ * rank (RANK(), so 1,1,3). Filters apply before ranking. Deactivated users are hidden from
+ * an active period's board but stay on the board of an ended period (history is immutable).
+ */
+export async function getLeaderboard(
+	db: Pick<Db, 'select'>,
+	periodId: number,
+	filter: LeaderboardFilter = {}
+): Promise<LeaderboardRow[]> {
+	const conds: SQL[] = [
+		eq(submissions.periodId, periodId),
+		eq(submissions.status, 'approved'),
+		or(eq(periods.status, 'ended'), eq(users.active, true))!
+	];
+	if (filter.classification) conds.push(eq(users.classification, filter.classification));
+	if (filter.department) conds.push(eq(users.department, sql`${filter.department}`));
+
+	const points = sql<number>`sum(${submissions.pointsAwarded})::int`;
+	const agg = db
+		.select({
+			userId: users.id,
+			username: users.displayUsername,
+			avatar: users.avatarPath,
+			points: points.as('points')
+		})
+		.from(submissions)
+		.innerJoin(users, eq(users.id, submissions.userId))
+		.innerJoin(periods, eq(periods.id, submissions.periodId))
+		.where(and(...conds))
+		.groupBy(users.id, users.displayUsername, users.avatarPath)
+		.having(sql`sum(${submissions.pointsAwarded}) > 0`)
+		.as('agg');
+
+	return db
+		.select({
+			userId: agg.userId,
+			username: agg.username,
+			avatar: agg.avatar,
+			points: agg.points,
+			rank: sql<number>`rank() over (order by ${agg.points} desc)::int`
+		})
+		.from(agg)
+		.orderBy(desc(agg.points), asc(agg.username));
+}
