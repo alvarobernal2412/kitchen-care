@@ -1,26 +1,40 @@
 <script lang="ts">
-	import { enhance } from '$app/forms';
 	import { IconCaretLeft, IconCaretRight } from '$lib/icons';
 	import type { NavState } from '$lib/nav';
 
 	/**
 	 * Collapse/expand button. A real form POST so it works without JavaScript; with JavaScript the
-	 * state flips immediately (`onflip`) and the request only stores the cookie.
+	 * state flips immediately (`onflip`) and a plain fetch stores the cookie. If that fails the
+	 * flip is rolled back, and a redirect (expired session) goes where the server sent us.
 	 */
 	let { state, onflip }: { state: NavState; onflip: (next: NavState) => void } = $props();
 
 	const next = $derived<NavState>(state === 'expanded' ? 'collapsed' : 'expanded');
+
+	async function submit(event: SubmitEvent) {
+		event.preventDefault();
+		const previous = state;
+		const target = next;
+		onflip(target);
+		try {
+			const res = await fetch('/preferences/nav', {
+				method: 'POST',
+				headers: { accept: 'application/json' },
+				body: new URLSearchParams({ state: target })
+			});
+			if (res.redirected) {
+				onflip(previous);
+				window.location.assign(res.url); // e.g. the session expired: land on /login
+				return;
+			}
+			if (!res.ok) onflip(previous);
+		} catch {
+			onflip(previous);
+		}
+	}
 </script>
 
-<form
-	method="POST"
-	action="/preferences/nav"
-	use:enhance={() => {
-		onflip(next);
-		// The cookie is stored by the server; nothing to reload.
-		return async () => {};
-	}}
->
+<form method="POST" action="/preferences/nav" onsubmit={submit}>
 	<input type="hidden" name="state" value={next} />
 	<button
 		type="submit"
