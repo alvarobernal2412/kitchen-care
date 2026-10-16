@@ -1,0 +1,113 @@
+name: Deploy
+
+# On every push to main: run the CI jobs, then build the image on the runner (never on the VPS),
+# stream it to the VPS over SSH to a forced-command key (deploy/remote-deploy.sh), and check the
+# public /healthz. If the deploy secrets are not configured yet, the deploy job skips cleanly.
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    name: Build and deploy
+    needs: ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    env:
+      DOMAIN: ${{ vars.DOMAIN || secrets.DOMAIN }}
+    steps:
+      - name: Check deploy configuration
+        id: cfg
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          missing=""
+          for v in DEPLOY_HOST DEPLOY_SSH_KEY DEPLOY_KNOWN_HOSTS DOMAIN; do
+            eval "val=\${$v:-}"
+            [ -n "$val" ] || missing="$missing $v"
+          done
+          if [ -n "$missing" ]; then
+            echo "::notice title=Deploy skipped::Not configured yet (missing:$missing). See deploy/README.md, section GitHub secrets."
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.cfg.outputs.configured == 'true'
+
+      - uses: docker/setup-buildx-action@v3
+        if: steps.cfg.outputs.configured == 'true'
+
+      - name: Compute image tag
+        if: steps.cfg.outputs.configured == 'true'
+        run: echo "TAG=$(printf '%s' "$GITHUB_SHA" | cut -c1-12)" >> "$GITHUB_ENV"
+
+      - name: Build image
+        if: steps.cfg.outputs.configured == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          platforms: linux/amd64
+          tags: kitchen-care-app:${{ env.TAG }}
+          outputs: type=docker,dest=${{ runner.temp }}/image.tar
+          cache-from: type=gha,scope=app
+          cache-to: type=gha,scope=app,mode=max
+
+      - name: Assemble deploy stream
+        if: steps.cfg.outputs.configured == 'true'
+        run: |
+          set -eu
+          mkdir -p "$RUNNER_TEMP/stream/bundle"
+          gzip -c "$RUNNER_TEMP/image.tar" > "$RUNNER_TEMP/stream/image.tar.gz"
+          cp compose.yml compose.hostport.yml "$RUNNER_TEMP/stream/bundle/"
+          cp -r deploy "$RUNNER_TEMP/stream/bundle/deploy"
+          rm -rf "$RUNNER_TEMP/stream/bundle/deploy/local"
+          tar -C "$RUNNER_TEMP/stream" -cf "$RUNNER_TEMP/stream.tar" image.tar.gz bundle
+          ls -l "$RUNNER_TEMP/stream.tar"
+
+      - name: Ship to the VPS and deploy
+        if: steps.cfg.outputs.configured == 'true'
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -eu
+          umask 077
+          mkdir -p ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          # The forced command on the VPS reads the stream and takes the tag as its argument.
+          ssh -i ~/.ssh/deploy_key \
+            -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
+            "${DEPLOY_USER:-root}@${DEPLOY_HOST}" "$TAG" < "$RUNNER_TEMP/stream.tar"
+
+      - name: Post-deploy check (public /healthz through NPM)
+        if: steps.cfg.outputs.configured == 'true'
+        run: |
+          for i in $(seq 1 12); do
+            if body=$(curl -fsS --max-time 10 "https://$DOMAIN/healthz") && printf '%s' "$body" | grep -q '"ok":true'; then
+              echo "healthy: https://$DOMAIN/healthz -> $body"
+              exit 0
+            fi
+            echo "attempt $i/12: not healthy yet"
+            sleep 5
+          done
+          echo "::error title=Post-deploy check failed::https://$DOMAIN/healthz did not return {\"ok\":true} within ~60s. The VPS deploy finished, so check the NPM Proxy Host for $DOMAIN (forward kitchen-care-proxy:80) and TLS."
+          exit 1
