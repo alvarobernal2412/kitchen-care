@@ -31,7 +31,7 @@
 
 ---
 
-### Task D1: Design foundation
+### Task 1: Design foundation
 
 **Files:**
 - Create: `src/lib/styles/tokens.css`, `src/lib/styles/base.css`, `src/lib/styles/components.css` (shared classes: buttons, chips, form fields, lists/rows, segmented control, tile base, skeleton), `src/lib/icons/*.svelte` (one component per icon, props `size?: number`, `class?: string`, `title?: string`), `src/lib/components/Avatar.svelte`, `src/lib/components/Segmented.svelte`, `src/lib/avatarTint.ts`, `tests/unit/avatarTint.test.ts`, `tests/unit/tokenContrast.test.ts`
@@ -46,7 +46,7 @@
 - [ ] **Step 4: Run** the new tests, the full unit suite, `npm run check`, `npm run lint`, `npm run build`; run the existing e2e suite (`npm run test:e2e`) to confirm nothing regressed (the old page styles may look odd until later tasks; that is expected, behaviour must not break).
 - [ ] **Step 5: Commit** in atomic steps (`feat(ui): add design tokens and base styles`, `feat(ui): add icons and shared components`, `chore(pwa): refresh theme colors and icons`).
 
-### Task D2: App shell (bottom tabs + collapsible sidebar)
+### Task 2: App shell (bottom tabs + collapsible sidebar)
 
 **Files:**
 - Create: `src/lib/components/AppShell.svelte`, `src/lib/components/SidebarToggle.svelte`, `src/lib/nav.ts`, `src/routes/preferences/nav/+server.ts`, `tests/unit/nav.test.ts`, `tests/e2e/shell.spec.ts`
@@ -61,7 +61,7 @@
 - [ ] **Step 4: Run** unit, lint, check, build, full e2e.
 - [ ] **Step 5: Commit** (`feat(ui): add app shell with bottom tabs and collapsible sidebar`, `feat(ui): persist sidebar state in a cookie`).
 
-### Task D3: Home
+### Task 3: Home
 
 **Files:**
 - Create: `src/lib/components/ChoreTile.svelte`, `src/lib/components/CreditHeader.svelte`, `src/lib/components/RecentActivity.svelte`, `src/lib/server/standing.ts`, `tests/unit/standing.test.ts`, `tests/e2e/home.spec.ts`
@@ -76,7 +76,7 @@
 - [ ] **Step 4: Run** unit, lint, check, build, full e2e.
 - [ ] **Step 5: Commit** (`feat(home): add standing and recent activity queries`, `feat(home): redesign home with chore tiles`).
 
-### Task D4: Leaderboard, History and Feed
+### Task 4: Leaderboard, History and Feed
 
 **Files:** Modify `src/routes/(app)/leaderboard/*`, `src/routes/(app)/history/*`, `src/routes/(app)/feed/*`, `src/lib/components/{Post,Reactions,Comments}.svelte`; Create `tests/e2e/screens-community.spec.ts`.
 
@@ -88,7 +88,7 @@
 - [ ] **Step 4: Run** unit, lint, check, build, full e2e.
 - [ ] **Step 5: Commit** (`feat(ui): redesign leaderboard and history`, `feat(ui): redesign feed`).
 
-### Task D5: Onboarding, auth, profile, error and offline pages
+### Task 5: Onboarding, auth, profile, error and offline pages
 
 **Files:** Modify `src/routes/(app)/onboarding/*`, `src/routes/(auth)/**`, `src/routes/(app)/profile/*`, `src/lib/components/PasswordMeter.svelte`, `static/offline/index.html`, `src/routes/+error.svelte` (create if missing); Create `tests/e2e/screens-account.spec.ts`.
 
@@ -100,7 +100,7 @@
 - [ ] **Step 4: Run** unit, lint, check, build, full e2e.
 - [ ] **Step 5: Commit** (`feat(ui): redesign onboarding and auth pages`, `feat(ui): redesign profile, error and offline pages`).
 
-### Task D6: Admin screens and overlays
+### Task 6: Admin screens and overlays
 
 **Files:** Modify `src/routes/(admin)/admin/**/+page.svelte` (review, users, moderation, images, periods, analytics), `src/lib/components/charts/*`, `src/lib/components/CameraCapture.svelte`; Create `tests/e2e/screens-admin.spec.ts`.
 
@@ -112,7 +112,7 @@
 - [ ] **Step 4: Run** unit, lint, check, build, full e2e.
 - [ ] **Step 5: Commit** (`feat(admin): redesign review, users and moderation`, `feat(admin): redesign images, periods and analytics`, `feat(ui): restyle camera overlay`).
 
-### Task D7: Visual QA and accessibility pass
+### Task 7: Visual QA and accessibility pass
 
 **Files:** Create `tests/e2e/a11y.spec.ts`, `scripts/screenshots.mjs`; Modify as findings require; Add dev dependency `@axe-core/playwright`.
 
