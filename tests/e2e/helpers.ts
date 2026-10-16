@@ -81,3 +81,38 @@ export async function getUser(username: string) {
 		.where(eq(schema.users.usernameNormalized, username.toLowerCase()));
 	return u;
 }
+
+/** Lowest WCAG contrast ratio between any text in the first match of `selector` and the background it sits on. */
+export async function lowestContrast(page: Page, selector: string) {
+	return page.locator(selector).first().evaluate((root) => {
+		const parse = (c: string) => (c.match(/[\d.]+/g) ?? []).map(Number);
+		const lum = (c: number[]) => {
+			const [r, g, b] = c.slice(0, 3).map((v) => {
+				const x = v / 255;
+				return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4);
+			});
+			return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+		};
+		const bgOf = (el: Element | null): number[] => {
+			for (let e = el; e; e = e.parentElement) {
+				const c = parse(getComputedStyle(e).backgroundColor);
+				if (c.length >= 3 && (c.length === 3 || c[3] > 0.5)) return c;
+			}
+			return [255, 255, 255];
+		};
+		let lowest = { ratio: 21, text: '' };
+		const walk = (el: Element) => {
+			const hasText = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent!.trim());
+			if (hasText && (el as HTMLElement).offsetParent !== null) {
+				const fg = parse(getComputedStyle(el).color);
+				const a = lum(fg);
+				const b = lum(bgOf(el));
+				const ratio = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+				if (ratio < lowest.ratio) lowest = { ratio, text: el.textContent!.trim().slice(0, 30) };
+			}
+			for (const child of el.children) walk(child);
+		};
+		walk(root);
+		return lowest;
+	});
+}

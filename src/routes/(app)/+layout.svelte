@@ -4,6 +4,14 @@
 	import '$lib/styles/legacy.css'; // interim shim, see the file
 
 	let { data, children } = $props();
+
+	// Route prefixes that still have the old styling and need the `.legacy` shim (legacy.css).
+	// Home, Leaderboard, History and Feed are restyled. Remove entries as pages are restyled;
+	// delete the shim with the last one.
+	const LEGACY_PREFIXES = ['/profile', '/onboarding'];
+	const isLegacy = $derived(
+		LEGACY_PREFIXES.some((p) => page.url.pathname === p || page.url.pathname.startsWith(`${p}/`))
+	);
 </script>
 
 <AppShell
@@ -14,8 +22,8 @@
 	nav={data.nav}
 	pathname={page.url.pathname}
 >
-	<!-- Legacy page width until each screen is restyled (Home is done). -->
-	<div class:legacy={page.url.pathname !== '/'}>
+	<!-- Legacy page width only for the routes in LEGACY_PREFIXES. -->
+	<div class:legacy={isLegacy}>
 		{@render children()}
 	</div>
 </AppShell>
