@@ -6,6 +6,11 @@
 
 <header>
 	<a class="brand" href={resolve('/')}>Kitchen Care Credits</a>
+	<nav>
+		<a href={resolve('/leaderboard')}>Leaderboard</a>
+		<a href={resolve('/history')}>History</a>
+		{#if data.user.role === 'admin'}<a href={resolve('/admin/periods')}>Admin</a>{/if}
+	</nav>
 	<form method="POST" action="/logout">
 		<span>{data.user.displayUsername}</span>
 		<button type="submit" class="link">Log out</button>
@@ -38,6 +43,7 @@
 		cursor: not-allowed;
 	}
 	header {
+		flex-wrap: wrap;
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
@@ -50,6 +56,14 @@
 		font-weight: 700;
 		color: inherit;
 		text-decoration: none;
+	}
+	nav {
+		display: flex;
+		gap: 0.75rem;
+		font-size: 0.9rem;
+	}
+	nav a {
+		color: #1d4ed8;
 	}
 	header form {
 		display: flex;
