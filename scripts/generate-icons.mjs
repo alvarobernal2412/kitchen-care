@@ -1,5 +1,5 @@
 // Regenerates the PWA icons in static/icons/ (SVG sources + PNGs). Run: node scripts/generate-icons.mjs
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
@@ -18,7 +18,10 @@ const motif = `
 		<path d="M308 244h10a24 24 0 0 1 0 48h-14" fill="none" stroke="${PLASTER}" stroke-width="14" stroke-linecap="round"/>
 		<rect x="176" y="342" width="152" height="12" rx="6" fill="${PLASTER}"/>
 		<path d="M230 272l16 16 30-32" fill="none" stroke="${TEAL}" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
-	</g>`;
+	</g>`
+	.split('\n')
+	.map((l) => l.trim())
+	.join('');
 
 function svg({ maskable }) {
 	// Any-purpose: rounded plaster tile. Maskable: full-bleed plaster (the OS applies its own mask).
@@ -36,15 +39,28 @@ const any = svg({ maskable: false });
 const maskable = svg({ maskable: true });
 
 await mkdir(OUT, { recursive: true });
-await writeFile(join(OUT, 'icon.svg'), any);
-await writeFile(join(OUT, 'icon-maskable.svg'), maskable);
 
-const png = (source, size, name) =>
-	sharp(Buffer.from(source), { density: 384 }).resize(size, size).png().toFile(join(OUT, name));
+// Only touch files whose bytes actually change, so reruns leave git clean.
+async function writeIfChanged(name, data) {
+	const target = join(OUT, name);
+	const next = Buffer.from(data);
+	const prev = await readFile(target).catch(() => null);
+	if (prev && prev.equals(next)) return;
+	await writeFile(target, next);
+	console.log('updated', name);
+}
 
+const png = async (source, size, name) =>
+	writeIfChanged(
+		name,
+		await sharp(Buffer.from(source), { density: 384 }).resize(size, size).png().toBuffer()
+	);
+
+await writeIfChanged('icon.svg', any);
+await writeIfChanged('icon-maskable.svg', maskable);
 await png(any, 192, 'icon-192.png');
 await png(any, 512, 'icon-512.png');
 await png(maskable, 512, 'icon-maskable-512.png');
 // iOS ignores transparency and masks corners itself, so use the full-bleed version.
 await png(maskable.replace('scale(0.9)', 'scale(1)'), 180, 'apple-touch-icon.png');
-console.log('Icons written to', OUT);
+console.log('Icons up to date in', OUT);
