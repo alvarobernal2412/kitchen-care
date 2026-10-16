@@ -2,7 +2,8 @@ import { json } from '@sveltejs/kit';
 import { z } from 'zod';
 import { getDb } from '$lib/server/db';
 import { hit } from '$lib/server/ratelimit';
-import { getActivePeriod } from '$lib/server/periods';
+import { eq } from 'drizzle-orm';
+import { tasks } from '$lib/server/db/schema';
 import {
 	CooldownError,
 	InactiveUserError,
@@ -29,9 +30,15 @@ export const POST: RequestHandler = async ({ locals, params }) => {
 
 	const db = getDb();
 	try {
+		// Photo tasks must go through the photo flow (Task 8); never credit them here.
+		const [task] = await db.select().from(tasks).where(eq(tasks.key, key.data));
+		if (!task) return json({ error: 'unknown_task' }, { status: 404 });
+		if (task.requiresPhoto) return json({ error: 'photo_required' }, { status: 422 });
+
 		const submission = await logTask(db, user.id, key.data);
-		const period = await getActivePeriod(db);
-		const newTotal = period ? await getUserPeriodTotal(db, user.id, period.id) : undefined;
+		const newTotal = submission.periodId
+			? await getUserPeriodTotal(db, user.id, submission.periodId)
+			: undefined;
 		return json({ ok: true, pointsAwarded: submission.pointsAwarded, newTotal });
 	} catch (err) {
 		if (err instanceof CooldownError) {
