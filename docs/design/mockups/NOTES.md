@@ -4,7 +4,7 @@
 The interface is built like a kitchen wall: flat glazed tiles set on plaster, separated by grout lines instead of drop shadows. The chore tiles are the only loud element, with point values set huge in Bricolage Grotesque so the app reads as a wall of buttons you press, not a list of cards. Everything else (Geist, one enamel teal, green-tinted greys) stays quiet and Swiss-precise.
 
 ## Tokens
-Light: plaster #EDF0EB (ground), tile #F8FAF6 (surface), grout #D3D9D0 (lines), ink #1B2420, muted #5E6A62, enamel teal #127A68 (hover #0E6657, press #0B5A4C), wash #DCEBE6, accent text on wash #0B5A4C, glaze (cooldown fill) #DDE5DD.
+Light: plaster #EDF0EB (ground), tile #F8FAF6 (surface), grout #D3D9D0 (lines), ink #1B2420, muted #5C6860, enamel teal #127A68 (hover #0E6657, press #0B5A4C), wash #DCEBE6, accent text on wash #0B5A4C, glaze (cooldown fill) #DDE5DD.
 Pending: wash #F6ECD4, text #7C5509 (the brief's #9A6A12 is kept for icons and borders only; it fails AA for small text). Danger: brick #A63D2F, wash #F4E2DE.
 Dark: ground #101613, surface #18211C, lines #2A362F, ink #E8EDE6, muted #9AA89F, accent #3FB59C, wash #1F3A33, glaze #243229, pending text #E0B35A on #2E2613, danger #E0806F.
 

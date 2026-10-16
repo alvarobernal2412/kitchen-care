@@ -14,7 +14,23 @@ function declarations(fragment: string): Record<string, string> {
 const darkStart = css.indexOf('@media (prefers-color-scheme: dark)');
 if (darkStart < 0) throw new Error('tokens.css has no dark block');
 const light = declarations(css.slice(0, darkStart));
-const dark = { ...light, ...declarations(css.slice(darkStart)) };
+const darkOverrides = declarations(css.slice(darkStart));
+const dark = { ...light, ...darkOverrides };
+
+// Colour tokens that are intentionally identical in both schemes (none today). A colour defined
+// in the light block but missing from the dark block must be listed here, otherwise the dark
+// theme would silently reuse a light value.
+const SAME_IN_BOTH_SCHEMES: string[] = [];
+const isHex = (v: string) => /^#[0-9a-f]{6}$/i.test(v);
+
+describe('dark block completeness', () => {
+	it('redefines every light colour token (or lists it as intentionally shared)', () => {
+		const missing = Object.entries(light)
+			.filter(([k, v]) => isHex(v) && !(k in darkOverrides) && !SAME_IN_BOTH_SCHEMES.includes(k))
+			.map(([k]) => k);
+		expect(missing).toEqual([]);
+	});
+});
 
 function luminance(hex: string): number {
 	const v = /^#([0-9a-f]{6})$/i.exec(hex)?.[1];
@@ -30,26 +46,45 @@ function contrast(a: string, b: string): number {
 	return (hi + 0.05) / (lo + 0.05);
 }
 
+// Every text/background pair the shipped CSS (base.css, components.css, Avatar) can produce.
 const TEXT: [string, string][] = [
+	// body text and muted text on each surface
 	['ink', 'ground'],
 	['ink', 'surface'],
+	['ink', 'recess'], // .btn-quiet hover
+	['ink', 'accent-wash'], // highlighted ("you") row
+	['ink', 'glaze'],
 	['muted', 'ground'],
-	['muted', 'surface'],
+	['muted', 'surface'], // .help, .input::placeholder
+	['muted', 'recess'], // inactive .seg-item
+	['muted', 'accent-wash'],
+	['muted', 'glaze'],
+	// accent text
 	['accent', 'ground'],
 	['accent', 'surface'],
-	['accent-ink', 'accent-wash'],
-	['pending-ink', 'pending-wash'],
-	['danger', 'danger-wash'],
-	['on-accent', 'accent'],
+	['accent-ink', 'ground'], // links
+	['accent-ink', 'surface'], // active .seg-item
+	['accent-ink', 'recess'],
+	['accent-ink', 'accent-wash'], // .chip
+	['on-accent', 'accent'], // .btn-primary
 	['on-accent', 'accent-hover'],
 	['on-accent', 'accent-press'],
-	['ink', 'recess'],
-	['accent-ink', 'surface'],
+	// pending
+	['pending-ink', 'pending-wash'], // .chip-pending
+	['pending-ink', 'surface'],
+	['pending-ink', 'ground'],
+	// danger
+	['danger', 'ground'], // .error, .btn-danger
+	['danger', 'surface'],
+	['danger', 'danger-wash'], // .chip-danger, .btn-danger hover
 	...[1, 2, 3, 4, 5, 6].map((n): [string, string] => [`avatar-${n}-fg`, `avatar-${n}-bg`])
 ];
+// Focus ring, active indicator and invalid-field border are non-text.
 const NON_TEXT: [string, string][] = [
 	['accent', 'ground'],
-	['accent', 'surface']
+	['accent', 'surface'],
+	['danger', 'ground'],
+	['danger', 'surface']
 ];
 
 describe.each([
