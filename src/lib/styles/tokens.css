@@ -81,6 +81,17 @@
 	--r-chip: 6px;
 	--r-av: 12px;
 
+	/* z-index scale: page content < bars < tooltips < skip link < overlays (camera, dialogs) */
+	--z-bar: 10;
+	--z-tooltip: 20;
+	--z-skip: 100;
+	--z-overlay: 200;
+
+	/* app shell */
+	--bar-h: 56px;
+	--sidebar-w: 240px;
+	--rail-w: 72px;
+
 	/* motion: 150-200ms, transform/opacity/colour only */
 	--ease-press: cubic-bezier(0.3, 1.4, 0.5, 1);
 	--ease-out: ease-out;

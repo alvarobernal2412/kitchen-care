@@ -1,26 +1,23 @@
 <script lang="ts">
-	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
+	import AppShell from '$lib/components/AppShell.svelte';
 
 	let { data, children } = $props();
 </script>
 
-<header>
-	<a class="brand" href={resolve('/')}>Kitchen Care Credits</a>
-	<nav>
-		<a href={resolve('/admin/periods')}>Periods</a>
-		<a href={resolve('/admin/users')}>Users</a>
-		<a href={resolve('/admin/moderation')}>Moderation</a>
-		<a href={resolve('/admin/images')}>Images</a>
-		<a href={resolve('/admin/analytics')}>Analytics</a>
-		<a href={resolve('/admin/review')}>
-			Review{#if data.pendingCount > 0}<span class="badge">{data.pendingCount}</span>{/if}
-		</a>
-	</nav>
-	<span>{data.user.displayUsername}</span>
-</header>
-<main>
-	{@render children()}
-</main>
+<AppShell
+	isAdmin
+	username={data.user.displayUsername}
+	avatarPath={data.user.avatarPath}
+	pendingCount={data.pendingCount}
+	nav={data.nav}
+	pathname={page.url.pathname}
+>
+	<!-- Legacy page width until each screen is restyled. -->
+	<div class="legacy">
+		{@render children()}
+	</div>
+</AppShell>
 
 <style>
 	:global(body) {
@@ -48,39 +45,9 @@
 		padding: 0.6rem;
 		font: inherit;
 	}
-	header {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		gap: 1rem;
-		padding: 0.75rem 1rem;
-		background: white;
-		border-bottom: 1px solid #e5e7eb;
-	}
-	.brand {
-		font-weight: 700;
-		color: inherit;
-		text-decoration: none;
-	}
-	nav {
-		flex: 1;
-	}
-	nav a {
-		margin-right: 1rem;
-		color: #1d4ed8;
-	}
-	.badge {
-		margin-left: 0.3rem;
-		padding: 0.05rem 0.45rem;
-		font-size: 0.8rem;
-		font-weight: 700;
-		color: white;
-		background: #b91c1c;
-		border-radius: 999px;
-	}
-	main {
+	.legacy {
 		max-width: 40rem;
 		margin: 0 auto;
-		padding: 1.5rem 1rem;
+		padding: 1.5rem 0;
 	}
 </style>

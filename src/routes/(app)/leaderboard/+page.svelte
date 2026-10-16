@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import { avatarUrl } from '$lib/avatar';
 
 	let { data } = $props();
@@ -10,6 +11,7 @@
 
 <h2>Leaderboard</h2>
 {#if data.period}<p class="muted">{data.period.name}</p>{/if}
+<p><a href={resolve('/history')}>Past periods</a></p>
 
 <form method="GET" class="filters">
 	<label>

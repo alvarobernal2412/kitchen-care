@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { onDestroy } from 'svelte';
 	import PasswordMeter from '$lib/components/PasswordMeter.svelte';
 	import { avatarUrl } from '$lib/avatar';
@@ -161,6 +162,19 @@
 			<p class="ok" role="status">Password changed. Your other devices were signed out.</p>
 		{/if}
 		<button type="submit" disabled={pwBusy}>Change password</button>
+	</form>
+</section>
+
+{#if data.user.role === 'admin'}
+	<section>
+		<h3>Admin</h3>
+		<a href={resolve('/admin/review')}>Admin</a>
+	</section>
+{/if}
+
+<section>
+	<form method="POST" action="/logout">
+		<button type="submit" class="secondary">Sign out</button>
 	</form>
 </section>
 

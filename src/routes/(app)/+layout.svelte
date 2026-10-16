@@ -1,26 +1,23 @@
 <script lang="ts">
-	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
+	import AppShell from '$lib/components/AppShell.svelte';
 
 	let { data, children } = $props();
 </script>
 
-<header>
-	<a class="brand" href={resolve('/')}>Kitchen Care Credits</a>
-	<nav>
-		<a href={resolve('/feed')}>Feed</a>
-		<a href={resolve('/leaderboard')}>Leaderboard</a>
-		<a href={resolve('/history')}>History</a>
-		<a href={resolve('/profile')}>Profile</a>
-		{#if data.user.role === 'admin'}<a href={resolve('/admin/periods')}>Admin</a>{/if}
-	</nav>
-	<form method="POST" action="/logout">
-		<span>{data.user.displayUsername}</span>
-		<button type="submit" class="link">Log out</button>
-	</form>
-</header>
-<main>
-	{@render children()}
-</main>
+<AppShell
+	isAdmin={data.user.role === 'admin'}
+	username={data.user.displayUsername}
+	avatarPath={data.user.avatarPath}
+	pendingCount={data.pendingCount}
+	nav={data.nav}
+	pathname={page.url.pathname}
+>
+	<!-- Legacy page width until each screen is restyled. -->
+	<div class="legacy">
+		{@render children()}
+	</div>
+</AppShell>
 
 <style>
 	:global(body) {
@@ -44,45 +41,9 @@
 		opacity: 0.6;
 		cursor: not-allowed;
 	}
-	header {
-		flex-wrap: wrap;
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 1rem;
-		padding: 0.75rem 1rem;
-		background: white;
-		border-bottom: 1px solid #e5e7eb;
-	}
-	.brand {
-		font-weight: 700;
-		color: inherit;
-		text-decoration: none;
-	}
-	nav {
-		display: flex;
-		gap: 0.75rem;
-		font-size: 0.9rem;
-	}
-	nav a {
-		color: #1d4ed8;
-	}
-	header form {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		font-size: 0.9rem;
-	}
-	button.link {
-		width: auto;
-		padding: 0.3rem 0.6rem;
-		color: #1d4ed8;
-		background: transparent;
-		border: 1px solid #d1d5db;
-	}
-	main {
+	.legacy {
 		max-width: 24rem;
 		margin: 0 auto;
-		padding: 1.5rem 1rem;
+		padding: 1.5rem 0;
 	}
 </style>
