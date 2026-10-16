@@ -11,7 +11,8 @@
 		"lint": "eslint .",
 		"test": "vitest run",
 		"test:e2e": "playwright test",
-		"db:push": "drizzle-kit push"
+		"db:push": "drizzle-kit push",
+		"db:generate": "drizzle-kit generate"
 	},
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",
@@ -33,6 +34,7 @@
 		"vitest": "^5.0.5"
 	},
 	"dependencies": {
+		"@node-rs/argon2": "^2.2.2",
 		"drizzle-orm": "^0.45.4",
 		"postgres": "^3.4.9"
 	}
