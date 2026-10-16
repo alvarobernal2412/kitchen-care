@@ -16,14 +16,17 @@ afterEach(async () => {
 	await rm(dir, { recursive: true, force: true });
 });
 
-const get = (file: string, authed = true) =>
-	GET({
-		locals: { user: authed ? { id: 1 } : null },
-		params: { file }
-	} as unknown as Parameters<typeof GET>[0]).then(
-		(r) => ({ status: r.status, res: r }),
-		(e: { status: number }) => ({ status: e.status, res: null })
-	);
+async function get(file: string, authed = true) {
+	try {
+		const res = await GET({
+			locals: { user: authed ? { id: 1 } : null },
+			params: { file }
+		} as unknown as Parameters<typeof GET>[0]);
+		return { status: res.status, res };
+	} catch (e) {
+		return { status: (e as { status: number }).status, res: null };
+	}
+}
 
 describe('GET /media/[file]', () => {
 	it('requires login', async () => {

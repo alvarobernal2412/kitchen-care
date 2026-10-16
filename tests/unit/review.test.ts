@@ -202,7 +202,7 @@ describe('approve / reject', () => {
 	});
 
 	it('calls onMilestone once for descale, never for beans', async () => {
-		const onMilestone = vi.fn(async () => {});
+		const onMilestone = vi.fn<(s: unknown, tx: unknown) => Promise<void>>(async () => {});
 		const b = await pending('beans');
 		await approve(t.db, admin, b.id, { onMilestone });
 		expect(onMilestone).not.toHaveBeenCalled();
