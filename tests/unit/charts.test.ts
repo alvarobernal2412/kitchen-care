@@ -6,7 +6,8 @@ import {
 	intensityStep,
 	isAllZero,
 	matrixMax,
-	niceMax
+	niceMax,
+	seriesSummary
 } from '../../src/lib/charts';
 
 describe('intensityStep', () => {
@@ -55,6 +56,16 @@ describe('niceMax', () => {
 		expect(niceMax(42)).toBe(50);
 		expect(niceMax(100)).toBe(100);
 		expect(niceMax(101)).toBe(200);
+	});
+});
+
+describe('seriesSummary', () => {
+	it('names the actual bucket and lists totals', () => {
+		const parts = [{ name: 'app opens', total: 1200 }, { name: 'active users', total: 4 }];
+		expect(seriesSummary('day', '2026-10-01T00:00:00Z', '2026-10-16T10:00:00Z', parts)).toBe(
+			'Daily chart from 2026-10-01 to 2026-10-16: 1,200 app opens, 4 active users.'
+		);
+		expect(seriesSummary('week', '2026-10-01', '2026-10-16', parts)).toMatch(/^Weekly chart/);
 	});
 });
 

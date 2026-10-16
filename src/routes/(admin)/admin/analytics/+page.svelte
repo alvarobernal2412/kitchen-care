@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { formatCount } from '$lib/charts';
+	import { formatCount, seriesSummary } from '$lib/charts';
 	import BarChart from '$lib/components/charts/BarChart.svelte';
 	import Heatmap from '$lib/components/charts/Heatmap.svelte';
 
@@ -10,9 +10,19 @@
 	const points = $derived(
 		data.activity.map((a) => ({ label: a.bucket, values: [a.opens, a.submissions] }))
 	);
+	const userPoints = $derived(
+		data.activity.map((a) => ({ label: a.bucket, values: [a.activeUsers] }))
+	);
 	const summary = $derived(
-		`Daily or weekly app opens and task submissions from ${day(data.from)} to ${day(data.to)}: ` +
-			`${formatCount(data.totals.opens)} opens, ${formatCount(data.totals.submissions)} submissions.`
+		seriesSummary(data.query.bucket, data.from, data.to, [
+			{ name: 'app opens', total: data.totals.opens },
+			{ name: 'task submissions', total: data.totals.submissions }
+		])
+	);
+	const userSummary = $derived(
+		seriesSummary(data.query.bucket, data.from, data.to, [
+			{ name: 'distinct active users over the whole range', total: data.totals.activeUsers }
+		]) + ' Each bar is the distinct users active in that period.'
 	);
 	const maxCount = $derived(Math.max(1, ...data.distribution.map((d) => d.count)));
 </script>
@@ -68,6 +78,11 @@
 		]}
 		{summary}
 	/>
+</section>
+
+<section>
+	<h3>Active users</h3>
+	<BarChart points={userPoints} series={[{ name: 'Active users', cls: 's1' }]} summary={userSummary} />
 </section>
 
 <section>

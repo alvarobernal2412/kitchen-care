@@ -33,6 +33,18 @@ export function formatCount(n: number): string {
 	return numberFormat.format(n);
 }
 
+/** Accessible one-line description of a time series, naming the actual bucket size. */
+export function seriesSummary(
+	bucket: 'day' | 'week',
+	from: string,
+	to: string,
+	parts: { name: string; total: number }[]
+): string {
+	const kind = bucket === 'day' ? 'Daily' : 'Weekly';
+	const list = parts.map((p) => `${formatCount(p.total)} ${p.name}`).join(', ');
+	return `${kind} chart from ${from.slice(0, 10)} to ${to.slice(0, 10)}: ${list}.`;
+}
+
 /** Largest value in a matrix (0 when empty). */
 export function matrixMax(matrix: number[][]): number {
 	let max = 0;
