@@ -41,7 +41,7 @@ export type ApproveOptions = {
 	now?: Date;
 };
 
-async function assertAdmin(tx: Pick<Db, 'select'>, adminId: number) {
+export async function assertAdmin(tx: Pick<Db, 'select'>, adminId: number) {
 	const [a] = await tx
 		.select({ role: users.role, active: users.active })
 		.from(users)
