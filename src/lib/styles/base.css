@@ -1,4 +1,23 @@
-/* Reset and typography. Mobile-first: no max-width media queries anywhere. */
+/*
+ * Reset and typography. Mobile-first: no max-width media queries anywhere.
+ *
+ * Global style effects on legacy pages (these apply to every page, including screens not yet
+ * restyled; later tasks should expect and, where needed, override them):
+ *  - body: Geist at 16px/1.5 on --ground with --ink text, tabular numbers on ALL text,
+ *    overflow-x hidden, min-height 100dvh (legacy layouts' own :global(body) may still win on
+ *    font-family/background).
+ *  - h1/h2/h3: Bricolage Grotesque 700, letter-spacing -0.02em, text-wrap balance, margin 0
+ *    (default browser margins are gone). h1 is 32px/1.05, h2 is 22px/1.15, h3 keeps the browser
+ *    default size.
+ *  - p: margin 0 (default margins gone), max-width 62ch, text-wrap pretty.
+ *  - a: color is --accent-ink (teal) instead of the browser/legacy blue unless a rule overrides it.
+ *  - button/select/input/textarea: font and color inherit.
+ *  - img/svg/video: max-width 100%.
+ *  - :focus-visible: 2px --accent outline, 2px offset, on everything.
+ *  - html: smooth scrolling unless prefers-reduced-motion; reduced motion shortens all
+ *    transitions and animations to ~0.
+ *  - global helper classes: .num, .display, .muted, .app (min-height 100dvh).
+ */
 *,
 *::before,
 *::after {
