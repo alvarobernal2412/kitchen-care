@@ -7,6 +7,7 @@ const EXACT = new Set([
 	'/reset-password',
 	'/logout',
 	'/healthz',
+	'/healthz/ready',
 	'/manifest.webmanifest',
 	'/service-worker.js',
 	'/robots.txt',

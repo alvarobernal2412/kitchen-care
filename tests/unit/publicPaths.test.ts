@@ -8,6 +8,7 @@ const cases: [string, boolean][] = [
 	['/reset-password', true],
 	['/logout', true],
 	['/healthz', true],
+	['/healthz/ready', true],
 	['/manifest.webmanifest', true],
 	['/service-worker.js', true],
 	['/robots.txt', true],
