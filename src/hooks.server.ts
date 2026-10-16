@@ -4,6 +4,7 @@ import { clearSessionCookie } from '$lib/server/auth/cookie';
 import { SESSION_COOKIE, getSessionUser } from '$lib/server/auth/session';
 import { isForbiddenApiMutation } from '$lib/server/csrf';
 import { getDb } from '$lib/server/db';
+import { recordAppOpen, shouldRecordAppOpen } from '$lib/server/events';
 
 export const handle: Handle = async ({ event, resolve }) => {
 	if (isForbiddenApiMutation(event.request, event.url)) {
@@ -15,6 +16,13 @@ export const handle: Handle = async ({ event, resolve }) => {
 	if (sessionId) {
 		event.locals.user = await getSessionUser(getDb(), sessionId);
 		if (!event.locals.user) clearSessionCookie(event.cookies);
+	}
+
+	if (event.locals.user && shouldRecordAppOpen(event.request, event.url)) {
+		// Fire and forget: analytics must never slow down or fail a request.
+		recordAppOpen(getDb(), event.locals.user.id).catch(() =>
+			console.warn('Could not record app_open event')
+		);
 	}
 
 	const response = await resolve(event);
