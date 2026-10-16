@@ -92,6 +92,8 @@ export function safeReturnPath(referer: string | null | undefined, origin: strin
 		const url = new URL(referer);
 		if (url.origin !== origin) return '/';
 		if (!url.pathname.startsWith('/') || url.pathname.startsWith('//')) return '/';
+		// Encoded slashes/backslashes and control characters have no place in a return path.
+		if (/%2f|%5c|%0[0-9a-f]|%1[0-9a-f]|\\/i.test(url.pathname)) return '/';
 		return url.pathname;
 	} catch {
 		return '/';

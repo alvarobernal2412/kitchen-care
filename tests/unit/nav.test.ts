@@ -79,6 +79,11 @@ describe('safeReturnPath', () => {
 		expect(safeReturnPath('javascript:alert(1)', origin)).toBe('/');
 		expect(safeReturnPath('https://kitchen.example//evil.com', origin)).toBe('/');
 		expect(safeReturnPath('not a url', origin)).toBe('/');
+		expect(safeReturnPath('https://kitchen.example/\\evil.com', origin)).toBe('/');
+		expect(safeReturnPath('https://kitchen.example/\t/evil.com', origin)).toBe('/');
+		expect(safeReturnPath('https://kitchen.example/\n/evil.com', origin)).toBe('/');
+		expect(safeReturnPath('https://kitchen.example/%2F%2Fevil.com', origin)).toBe('/');
+		expect(safeReturnPath('https://kitchen.example/%5Cevil.com', origin)).toBe('/');
 	});
 });
 
