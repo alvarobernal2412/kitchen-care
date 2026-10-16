@@ -19,8 +19,8 @@ import type { RequestHandler } from './$types';
 
 const keySchema = z.string().regex(/^[a-z_]{1,32}$/);
 const cutlerySchema = z.object({ taskKey: z.literal('cutlery'), detected: z.boolean() });
-// Allow multipart framing overhead on top of the image limit.
-const MAX_BODY_BYTES = MAX_INPUT_BYTES + 64 * 1024;
+// Image limit plus a small allowance for multipart framing (5.5 MB total).
+const MAX_BODY_BYTES = MAX_INPUT_BYTES + 512 * 1024;
 
 function mapError(err: unknown): Response {
 	if (err instanceof CooldownError) {
@@ -53,9 +53,11 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 
 	try {
 		if (type.startsWith('multipart/form-data')) {
-			// Refuse before buffering when the declared size is too big; the image size is
-			// checked again below for requests without a Content-Length.
-			const length = Number(request.headers.get('content-length') ?? 0);
+			// Browsers always send Content-Length for fetch + FormData. Requiring it lets us refuse
+			// oversized bodies before formData() buffers them.
+			const header = request.headers.get('content-length');
+			if (header === null) return json({ error: 'length_required' }, { status: 411 });
+			const length = Number(header);
 			if (!Number.isFinite(length) || length > MAX_BODY_BYTES) {
 				return json({ error: 'too_large' }, { status: 413 });
 			}

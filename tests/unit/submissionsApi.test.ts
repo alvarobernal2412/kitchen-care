@@ -65,8 +65,17 @@ async function multipart(taskKey: string, bytes?: Buffer) {
 	const form = new FormData();
 	form.set('taskKey', taskKey);
 	form.set('image', new File([new Uint8Array(image)], 'p.jpg', { type: 'image/jpeg' }));
-	const req = new Request('http://x/api/submissions', { method: 'POST', body: form });
-	return req;
+	// Like a browser: serialise first so Content-Length is present.
+	const probe = new Response(form);
+	const body = new Uint8Array(await probe.arrayBuffer());
+	return new Request('http://x/api/submissions', {
+		method: 'POST',
+		headers: {
+			'content-type': probe.headers.get('content-type')!,
+			'content-length': String(body.length)
+		},
+		body
+	});
 }
 
 describe('POST /api/submissions', () => {
@@ -94,6 +103,28 @@ describe('POST /api/submissions', () => {
 			body: 'x'
 		});
 		expect((await call(req)).status).toBe(413);
+	});
+
+	it('requires Content-Length on multipart (411)', async () => {
+		const req = new Request('http://x/api/submissions', {
+			method: 'POST',
+			headers: { 'content-type': 'multipart/form-data; boundary=x' },
+			body: 'x'
+		});
+		expect(req.headers.get('content-length')).toBeNull();
+		const r = await call(req);
+		expect(r).toEqual({ status: 411, body: { error: 'length_required' } });
+	});
+
+	it('rejects a declared length just over 5.5 MB (413) and accepts one under', async () => {
+		const req = (len: number) =>
+			new Request('http://x/api/submissions', {
+				method: 'POST',
+				headers: { 'content-type': 'multipart/form-data; boundary=x', 'content-length': String(len) },
+				body: 'x'
+			});
+		expect((await call(req(5.5 * 1024 * 1024 + 1))).status).toBe(413);
+		expect((await call(req(1024))).status).toBe(400); // passes the size gate, then bad form
 	});
 
 	it('credits cutlery once detected, and cools down', async () => {
