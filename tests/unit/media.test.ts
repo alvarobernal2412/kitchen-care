@@ -16,10 +16,10 @@ afterEach(async () => {
 	await rm(dir, { recursive: true, force: true });
 });
 
-async function get(file: string, authed = true) {
+async function get(file: string, authed = true, active = true) {
 	try {
 		const res = await GET({
-			locals: { user: authed ? { id: 1 } : null },
+			locals: { user: authed ? { id: 1, active } : null },
 			params: { file }
 		} as unknown as Parameters<typeof GET>[0]);
 		return { status: res.status, res };
@@ -31,6 +31,10 @@ async function get(file: string, authed = true) {
 describe('GET /media/[file]', () => {
 	it('requires login', async () => {
 		expect((await get('a'.repeat(32) + '.webp', false)).status).toBe(401);
+	});
+
+	it('forbids deactivated users', async () => {
+		expect((await get('a'.repeat(32) + '.webp', true, false)).status).toBe(403);
 	});
 
 	it('404s on bad names and missing files', async () => {

@@ -7,6 +7,7 @@ import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async ({ locals, params }) => {
 	if (!locals.user) error(401, 'Sign in required');
+	if (!locals.user.active) error(403, 'Account is not active');
 
 	let path: string;
 	try {
