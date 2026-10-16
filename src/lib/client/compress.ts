@@ -22,11 +22,29 @@ function sourceSize(source: ImageBitmap | HTMLVideoElement | HTMLCanvasElement) 
 	return { width: source.width, height: source.height };
 }
 
-function toBlob(canvas: HTMLCanvasElement, quality: number): Promise<Blob | null> {
-	return new Promise((resolve) => canvas.toBlob(resolve, 'image/webp', quality));
+export type Encode = (type: 'image/webp' | 'image/jpeg', quality: number) => Promise<Blob | null>;
+
+/**
+ * Prefers WebP; if the browser silently returns another type (iOS/WebKit), uses JPEG instead.
+ * Steps quality down until the blob is under the size target (or returns the smallest attempt).
+ * The server re-encodes to WebP anyway, so the client format only matters for upload size.
+ */
+export async function encodeUnderLimit(encode: Encode, maxBytes = MAX_BYTES): Promise<Blob> {
+	let type: 'image/webp' | 'image/jpeg' = 'image/webp';
+	let blob: Blob | null = null;
+	for (const quality of QUALITY_STEPS) {
+		blob = await encode(type, quality);
+		if (blob && type === 'image/webp' && blob.type !== 'image/webp') {
+			type = 'image/jpeg';
+			blob = await encode(type, quality);
+		}
+		if (!blob) throw new Error('Could not encode the image');
+		if (blob.size <= maxBytes) break;
+	}
+	return blob!;
 }
 
-export async function compressToWebp(
+export async function compressForUpload(
 	source: ImageBitmap | HTMLVideoElement | HTMLCanvasElement
 ): Promise<Blob> {
 	const size = sourceSize(source);
@@ -39,13 +57,7 @@ export async function compressToWebp(
 	if (!ctx) throw new Error('Canvas is not supported');
 	ctx.drawImage(source, 0, 0, width, height);
 
-	let blob: Blob | null = null;
-	for (const quality of QUALITY_STEPS) {
-		blob = await toBlob(canvas, quality);
-		if (!blob || blob.type !== 'image/webp') {
-			throw new Error('This browser cannot encode WebP images');
-		}
-		if (blob.size <= MAX_BYTES) break;
-	}
-	return blob!;
+	return encodeUnderLimit(
+		(type, quality) => new Promise((resolve) => canvas.toBlob(resolve, type, quality))
+	);
 }
