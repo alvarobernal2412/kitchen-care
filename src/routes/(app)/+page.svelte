@@ -1,15 +1,28 @@
 <script lang="ts">
+	import { onDestroy } from 'svelte';
 	import { invalidateAll } from '$app/navigation';
 	import { formatRemaining } from '$lib/duration';
 
 	let { data } = $props();
 
-	// Wait (seconds) per task key, seeded from the server and updated on 409 responses.
-	let waits = $state<Record<string, number>>({});
+	let now = $state(Date.now());
+	const timer = setInterval(() => (now = Date.now()), 1000);
+	onDestroy(() => clearInterval(timer));
+
+	// Absolute availability time (ms) per task key. Server values are anchored to the moment
+	// the data arrived; 409 responses override them. Remaining time is derived from `now`.
+	let overrides = $state<Record<string, number>>({});
+	const serverAvailableAt = $derived.by(() => {
+		const loadedAt = Date.now();
+		const out: Record<string, number> = {};
+		for (const t of data.selfReported) out[t.key] = loadedAt + t.retryAfterSeconds * 1000;
+		return out;
+	});
 	let busyKey = $state<string | null>(null);
 	let message = $state<{ kind: 'ok' | 'error'; text: string } | null>(null);
 
-	const waitFor = (key: string, fromServer: number) => waits[key] ?? fromServer;
+	const waitFor = (key: string) =>
+		Math.max(0, Math.ceil(((overrides[key] ?? serverAvailableAt[key] ?? 0) - now) / 1000));
 
 	async function log(key: string) {
 		busyKey = key;
@@ -19,10 +32,10 @@
 			const body = await res.json().catch(() => ({}));
 			if (res.ok) {
 				message = { kind: 'ok', text: `+${body.pointsAwarded} points logged` };
-				waits = {};
+				overrides = {};
 				await invalidateAll();
 			} else if (body.error === 'cooldown') {
-				waits[key] = body.retryAfterSeconds;
+				overrides[key] = Date.now() + body.retryAfterSeconds * 1000;
 				message = { kind: 'error', text: `Try again in ${formatRemaining(body.retryAfterSeconds)}` };
 			} else if (body.error === 'no_active_period') {
 				message = { kind: 'error', text: 'No active period right now.' };
@@ -56,7 +69,7 @@
 <h3>Log a task</h3>
 <ul>
 	{#each data.selfReported as task (task.key)}
-		{@const wait = waitFor(task.key, task.retryAfterSeconds)}
+		{@const wait = waitFor(task.key)}
 		<li>
 			<button
 				type="button"
