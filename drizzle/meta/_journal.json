@@ -15,6 +15,13 @@
       "when": 1792153090075,
       "tag": "0001_soft_venus",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792157513604,
+      "tag": "0002_submission_image_removed",
+      "breakpoints": true
     }
   ]
 }

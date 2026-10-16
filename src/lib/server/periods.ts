@@ -73,6 +73,18 @@ export async function endPeriod(db: Db, periodId: number): Promise<PeriodWinner[
 	});
 }
 
+/** Number of submissions still awaiting review in a period. */
+export async function countPendingInPeriod(
+	db: Pick<Db, 'select'>,
+	periodId: number
+): Promise<number> {
+	const [row] = await db
+		.select({ n: sql<number>`count(*)::int` })
+		.from(submissions)
+		.where(and(eq(submissions.periodId, periodId), eq(submissions.status, 'pending')));
+	return row.n;
+}
+
 export type PastPeriod = {
 	id: number;
 	name: string;

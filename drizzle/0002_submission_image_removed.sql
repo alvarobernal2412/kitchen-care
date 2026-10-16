@@ -1,0 +1,1 @@
+ALTER TABLE "submissions" ADD COLUMN "image_removed_at" timestamp with time zone;

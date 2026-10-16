@@ -129,6 +129,7 @@ export const submissions = pgTable(
 		status: text('status', { enum: ['pending', 'approved', 'rejected'] }).notNull(),
 		pointsAwarded: integer('points_awarded').notNull().default(0),
 		imagePath: text('image_path'),
+		imageRemovedAt: timestamp('image_removed_at', { withTimezone: true }),
 		rejectReason: text('reject_reason'),
 		createdAt: createdAt(),
 		reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
