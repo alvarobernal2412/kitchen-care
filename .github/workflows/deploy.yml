@@ -39,10 +39,15 @@ jobs:
         env:
           # Optional repository variable; the script lives in the clone, /opt/kitchen-care by default.
           DEPLOY_DIR: ${{ vars.DEPLOY_DIR }}
+          # The commit whose CI just passed: update.sh deploys exactly this one (it must be on
+          # main) and skips it if a newer commit is already deployed. Never "whatever main is now".
+          DEPLOY_SHA: ${{ github.sha }}
         run: '"${DEPLOY_DIR:-/opt/kitchen-care}/deploy/update.sh"'
 
       - name: Check the public URL
         if: ${{ vars.DOMAIN != '' }}
         env:
           DOMAIN: ${{ vars.DOMAIN }}
-        run: curl --fail --silent --show-error --retry 12 --retry-delay 5 --retry-all-errors "https://$DOMAIN/healthz"
+        run: |
+          body=$(curl --fail --silent --show-error --retry 12 --retry-delay 5 --retry-all-errors "https://$DOMAIN/healthz")
+          printf '%s' "$body" | grep -q '"ok":true'

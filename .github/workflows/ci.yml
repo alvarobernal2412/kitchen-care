@@ -44,7 +44,9 @@ jobs:
       - run: npm run check
       - run: npm test
       - name: Deploy script tests
-        run: sh deploy/tests/test-lock.sh
+        run: |
+          sh deploy/tests/test-lock.sh
+          sh deploy/tests/test-update.sh
 
   e2e:
     name: Playwright e2e
