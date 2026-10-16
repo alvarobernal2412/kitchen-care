@@ -1,6 +1,6 @@
-import { and, asc, desc, eq, or, sql, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, sql, type SQL } from 'drizzle-orm';
 import type { Db } from './db';
-import { periods, submissions, users } from './db/schema';
+import { submissions, users } from './db/schema';
 
 export type LeaderboardFilter = {
 	classification?: 'Student' | 'Employee';
@@ -18,7 +18,7 @@ export type LeaderboardRow = {
 /**
  * Standings for a period: approved points only, users with 0 points omitted, ties share a
  * rank (RANK(), so 1,1,3). Filters apply before ranking. Deactivated users are hidden from
- * an active period's board but stay on the board of an ended period (history is immutable).
+ * every board (active or ended) so the live board always matches the winners recorded at end.
  */
 export async function getLeaderboard(
 	db: Pick<Db, 'select'>,
@@ -28,7 +28,7 @@ export async function getLeaderboard(
 	const conds: SQL[] = [
 		eq(submissions.periodId, periodId),
 		eq(submissions.status, 'approved'),
-		or(eq(periods.status, 'ended'), eq(users.active, true))!
+		eq(users.active, true)
 	];
 	if (filter.classification) conds.push(eq(users.classification, filter.classification));
 	if (filter.department) conds.push(eq(users.department, sql`${filter.department}`));
@@ -43,7 +43,6 @@ export async function getLeaderboard(
 		})
 		.from(submissions)
 		.innerJoin(users, eq(users.id, submissions.userId))
-		.innerJoin(periods, eq(periods.id, submissions.periodId))
 		.where(and(...conds))
 		.groupBy(users.id, users.displayUsername, users.avatarPath)
 		.having(sql`sum(${submissions.pointsAwarded}) > 0`)

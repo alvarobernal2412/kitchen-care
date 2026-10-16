@@ -124,17 +124,14 @@ describe('getLeaderboard', () => {
 		]);
 	});
 
-	it('hides deactivated users in the active period only', async () => {
+	it('hides deactivated users in both active and ended periods', async () => {
 		const a = await mkUser('alive');
 		const g = await mkUser('gone', { active: false });
 		await award(a, 3);
 		await award(g, 9);
 		expect((await getLeaderboard(t.db, periodId)).map((r) => r.username)).toEqual(['alive']);
 		await endPeriod(t.db, periodId);
-		expect((await getLeaderboard(t.db, periodId)).map((r) => r.username)).toEqual([
-			'gone',
-			'alive'
-		]);
+		expect((await getLeaderboard(t.db, periodId)).map((r) => r.username)).toEqual(['alive']);
 	});
 
 	it('leaves an ended period unchanged by submissions in other periods', async () => {
@@ -167,6 +164,18 @@ describe('endPeriod', () => {
 		expect(p.status).toBe('ended');
 		expect(p.endsAt).not.toBeNull();
 		expect(await t.db.select().from(periodWinners)).toHaveLength(2);
+	});
+
+	it('never makes a deactivated top scorer the winner; winners match the live board', async () => {
+		const a = await mkUser('top');
+		const b = await mkUser('next');
+		await award(a, 20);
+		await award(b, 8);
+		await t.db.update(users).set({ active: false }).where(eq(users.id, a));
+		const board = await getLeaderboard(t.db, periodId);
+		const winners = await endPeriod(t.db, periodId);
+		expect(winners.map((w) => [w.userId, w.points])).toEqual([[b, 8]]);
+		expect(board.filter((r) => r.rank === 1).map((r) => r.userId)).toEqual([b]);
 	});
 
 	it('throws when the period is already ended', async () => {
@@ -205,6 +214,18 @@ describe('endPeriod', () => {
 });
 
 describe('listPastPeriods', () => {
+	it('keeps a recorded winner in history after the user is deactivated', async () => {
+		const a = await mkUser('champ');
+		const b = await mkUser('other');
+		await award(a, 10);
+		await award(b, 4);
+		await endPeriod(t.db, periodId);
+		await t.db.update(users).set({ active: false }).where(eq(users.id, a));
+		const [p] = await listPastPeriods(t.db);
+		expect(p.winners).toEqual([{ userId: a, username: 'champ', points: 10 }]);
+		expect(p.participants).toBe(1);
+	});
+
 	it('lists ended periods newest first with winners and participant counts', async () => {
 		const a = await mkUser('amy');
 		const b = await mkUser('ben');

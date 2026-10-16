@@ -1,6 +1,6 @@
-import { and, asc, desc, eq, inArray } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from './db';
-import { periodWinners, periods, users } from './db/schema';
+import { periodWinners, periods, submissions, users } from './db/schema';
 import { getLeaderboard } from './leaderboard';
 
 export type Period = typeof periods.$inferSelect;
@@ -108,16 +108,38 @@ export async function listPastPeriods(db: Db): Promise<PastPeriod[]> {
 		)
 		.orderBy(asc(users.displayUsername));
 
-	return Promise.all(
-		ended.map(async (p) => ({
-			id: p.id,
-			name: p.name,
-			startsAt: p.startsAt,
-			endsAt: p.endsAt,
-			participants: (await getLeaderboard(db, p.id)).length,
-			winners: winnerRows
-				.filter((w) => w.periodId === p.id)
-				.map(({ userId, username, points }) => ({ userId, username, points }))
-		}))
-	);
+	// Active users with a positive approved total per period, i.e. the people on the board.
+	const scorers = db
+		.select({ periodId: submissions.periodId, userId: submissions.userId })
+		.from(submissions)
+		.innerJoin(users, eq(users.id, submissions.userId))
+		.where(
+			and(
+				inArray(
+					submissions.periodId,
+					ended.map((p) => p.id)
+				),
+				eq(submissions.status, 'approved'),
+				eq(users.active, true)
+			)
+		)
+		.groupBy(submissions.periodId, submissions.userId)
+		.having(sql`sum(${submissions.pointsAwarded}) > 0`)
+		.as('scorers');
+	const countRows = await db
+		.select({ periodId: scorers.periodId, n: sql<number>`count(*)::int` })
+		.from(scorers)
+		.groupBy(scorers.periodId);
+	const counts = new Map(countRows.map((r) => [r.periodId, r.n]));
+
+	return ended.map((p) => ({
+		id: p.id,
+		name: p.name,
+		startsAt: p.startsAt,
+		endsAt: p.endsAt,
+		participants: counts.get(p.id) ?? 0,
+		winners: winnerRows
+			.filter((w) => w.periodId === p.id)
+			.map(({ userId, username, points }) => ({ userId, username, points }))
+	}));
 }
