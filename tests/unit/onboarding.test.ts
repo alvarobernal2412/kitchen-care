@@ -4,7 +4,17 @@ import { getTestDb, type TestDb } from '../helpers/testDb';
 import { users } from '../../src/lib/server/db/schema';
 import { signUp } from '../../src/lib/server/auth/users';
 import { completeOnboarding } from '../../src/lib/server/onboarding';
-import { needsOnboarding } from '../../src/lib/onboarding';
+import { needsOnboarding, usesShell } from '../../src/lib/onboarding';
+
+describe('usesShell', () => {
+	it('hides the shell on the onboarding flow only', () => {
+		expect(usesShell('/onboarding')).toBe(false);
+		expect(usesShell('/onboarding/')).toBe(false);
+		expect(usesShell('/')).toBe(true);
+		expect(usesShell('/profile')).toBe(true);
+		expect(usesShell('/onboardingx')).toBe(true);
+	});
+});
 
 describe('needsOnboarding', () => {
 	const fresh = { onboardingCompleted: false };

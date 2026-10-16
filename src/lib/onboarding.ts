@@ -8,3 +8,8 @@ export function needsOnboarding(user: { onboardingCompleted: boolean }, pathname
 	if (user.onboardingCompleted) return false;
 	return !EXEMPT.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
+
+/** The first-run flow is shown without navigation (no sidebar or tab bar). */
+export function usesShell(pathname: string): boolean {
+	return !(pathname === '/onboarding' || pathname.startsWith('/onboarding/'));
+}
