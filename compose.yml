@@ -1,6 +1,6 @@
 # Production stack, designed to sit behind an existing Nginx Proxy Manager (NPM) on a shared VM.
 # Nothing here publishes a host port. NPM forwards to `kitchen-care-proxy:80` over the external
-# Docker network named by NPM_NETWORK. Run via deploy/deploy.sh; see deploy/README.md.
+# Docker network named by NPM_NETWORK. Run via deploy/update.sh (or deploy/deploy.sh); see deploy/README.md.
 name: kitchen-care
 
 x-logging: &logging

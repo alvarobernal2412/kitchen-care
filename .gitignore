@@ -11,3 +11,6 @@ playwright-report/
 .claude/
 build-scripts/
 state/
+
+# Last-known-good copies kept by deploy/update.sh while a deploy is in flight.
+deploy/nginx/*.prev

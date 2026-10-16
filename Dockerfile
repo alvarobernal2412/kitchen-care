@@ -8,7 +8,12 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
-RUN npm run build && npx vite build -c vite.scripts.config.ts
+# The build runs on the shared VPS (deploy/update.sh): cap the Node heap for the build RUN only,
+# so a Vite build cannot starve the other apps. It is not an ENV, so the final image is unaffected.
+ARG NODE_BUILD_MEMORY_MB=768
+RUN export NODE_OPTIONS="--max-old-space-size=${NODE_BUILD_MEMORY_MB}" \
+    && npm run build \
+    && npx vite build -c vite.scripts.config.ts
 
 # --- prod-deps: production node_modules only (no drizzle-kit, vite, ...) --------------------
 FROM node:${NODE_VERSION}-bookworm-slim AS prod-deps
