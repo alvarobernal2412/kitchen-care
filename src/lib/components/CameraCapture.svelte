@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
 	import { CameraError, isCameraSupported, startCamera, type CameraSession } from '$lib/client/camera';
-	import { compressToWebp } from '$lib/client/compress';
+	import { compressForUpload } from '$lib/client/compress';
 
 	type Source = ImageBitmap | HTMLCanvasElement;
 
@@ -35,13 +35,22 @@
 		errorMessage = e instanceof Error ? e.message : 'Something went wrong';
 	}
 
+	let destroyed = false;
+	let checkFailed = $state(false);
+
 	async function start() {
 		phase = 'starting';
 		try {
-			session = await startCamera(video!);
+			const s = await startCamera(video!);
+			// The component may have been destroyed while the permission prompt was open.
+			if (destroyed) {
+				s.stop();
+				return;
+			}
+			session = s;
 			phase = 'live';
 		} catch (e) {
-			setError(e);
+			if (!destroyed) setError(e);
 		}
 	}
 
@@ -55,41 +64,57 @@
 		if (previewUrl) URL.revokeObjectURL(previewUrl);
 		previewUrl = null;
 	}
-	onDestroy(release);
+	onDestroy(() => {
+		destroyed = true;
+		release();
+	});
 
+	/** Takes ownership of `source` and closes it when done. */
 	async function process(source: Source | Blob) {
 		phase = 'processing';
 		status = 'Processing photo…';
+		checkFailed = false;
+		let src: Source | null = null;
 		try {
-			let src: Source;
-			if (source instanceof Blob) {
-				src = await createImageBitmap(source);
-			} else {
-				src = source;
-			}
-			blob = await compressToWebp(src);
-			detected = null;
+			src = source instanceof Blob ? await createImageBitmap(source) : source;
+			const out = await compressForUpload(src);
+			let result: boolean | null = null;
 			if (detect) {
 				status = 'Checking the photo (first time may take a moment)…';
-				detected = await detect(src);
+				try {
+					// coco-ssd fetches its model weights at runtime from a remote host, so any
+					// CSP added later must allow that origin (connect-src).
+					result = await detect(src);
+				} catch {
+					// Keep the photo; the parent decides what to do with an unchecked result.
+					checkFailed = true;
+				}
 			}
+			if (destroyed) return;
+			blob = out;
+			detected = result;
 			if (previewUrl) URL.revokeObjectURL(previewUrl);
-			previewUrl = URL.createObjectURL(blob);
+			previewUrl = URL.createObjectURL(out);
 			phase = 'review';
 		} catch (e) {
-			setError(e);
+			if (!destroyed) setError(e);
+		} finally {
+			if (typeof ImageBitmap !== 'undefined' && src instanceof ImageBitmap) src.close();
 		}
 	}
 
 	async function snap() {
-		if (!session) return;
+		// Take the session synchronously so a double tap is a no-op.
+		const s = session;
+		if (!s) return;
+		session = null;
 		try {
-			const frame = await session.capture();
-			session.stop();
-			session = null;
+			const frame = await s.capture();
+			s.stop();
 			await process(frame);
 		} catch (e) {
-			setError(e);
+			s.stop();
+			if (!destroyed) setError(e);
 		}
 	}
 
@@ -101,6 +126,7 @@
 	async function retake() {
 		blob = null;
 		detected = null;
+		checkFailed = false;
 		if (previewUrl) URL.revokeObjectURL(previewUrl);
 		previewUrl = null;
 		if (supported) await start();
@@ -151,7 +177,9 @@
 		</div>
 	{:else if phase === 'review' && previewUrl}
 		<img class="feed" src={previewUrl} alt="Captured preview" />
-		{#if detect && detected === false}
+		{#if detect && checkFailed}
+			<p class="banner warn" role="alert">Couldn't check the photo for cutlery</p>
+		{:else if detect && detected === false}
 			<p class="banner warn" role="alert">No cutlery detected, retake</p>
 		{/if}
 	{/if}
