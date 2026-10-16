@@ -46,6 +46,9 @@
 			<span class="brand-text display" aria-hidden="true">Kitchen<br />Care Credits</span>
 		</a>
 
+		<SidebarToggle state={navState} onflip={(next) => (navState = next)} />
+
+		<div class="scroller">
 		<nav aria-label="Main" class="grow">
 			<ul>
 				{#each NAV_ITEMS as item (item.id)}
@@ -54,12 +57,13 @@
 						<a
 							class="item"
 							class:active
+							style:anchor-name="--nav-{item.id}"
 							href={resolve(item.href as '/')}
 							aria-current={active ? 'page' : undefined}
 						>
 							<item.icon size={22} />
 							<span class="label">{item.label}</span>
-							<span class="tip" aria-hidden="true">{item.label}</span>
+							<span class="tip" style:position-anchor="--nav-{item.id}" aria-hidden="true">{item.label}</span>
 						</a>
 					</li>
 				{/each}
@@ -74,13 +78,14 @@
 							<a
 								class="item"
 								class:active
+								style:anchor-name="--nav-{item.id}"
 								href={resolve(item.href as '/')}
 								aria-current={active ? 'page' : undefined}
 							>
 								<item.icon size={22} />
 								<span class="label">{item.label}</span>
 								{@render badge(item)}
-								<span class="tip" aria-hidden="true">{item.label}</span>
+								<span class="tip" style:position-anchor="--nav-{item.id}" aria-hidden="true">{item.label}</span>
 							</a>
 						</li>
 					{/each}
@@ -95,13 +100,13 @@
 				<span class="who-name label">{username}</span>
 			</div>
 			<form method="POST" action="/logout">
-				<button type="submit" class="item signout">
+				<button type="submit" class="item signout" style:anchor-name="--nav-signout">
 					<IconSignOut size={22} />
 					<span class="label">Sign out</span>
-					<span class="tip" aria-hidden="true">Sign out</span>
+					<span class="tip" style:position-anchor="--nav-signout" aria-hidden="true">Sign out</span>
 				</button>
 			</form>
-			<SidebarToggle state={navState} onflip={(next) => (navState = next)} />
+		</div>
 		</div>
 	</aside>
 
@@ -283,8 +288,16 @@
 			border-right: 1px solid var(--line);
 			transition: width var(--dur-base) var(--ease-out);
 		}
-		.shell[data-nav='expanded'] .sidebar {
-			overflow-y: auto; /* the rail must not clip its tooltips */
+		/* Brand and toggle stay put; the nav and the footer (user, Sign out) scroll under them. */
+		.scroller {
+			display: flex;
+			flex: 1;
+			flex-direction: column;
+			gap: var(--sp-2);
+			min-height: 0;
+		}
+		.shell[data-nav='expanded'] .scroller {
+			overflow-y: auto;
 		}
 		.content {
 			padding-bottom: 0;
@@ -475,6 +488,31 @@
 		.shell[data-nav='collapsed'] .item:focus-visible .tip {
 			visibility: visible;
 			opacity: 1;
+		}
+	}
+
+	/*
+	 * Short laptop screens: the full rail (with the Admin group) is taller than the window, so it
+	 * scrolls too. A scrolling box clips absolutely positioned children, so the tooltips switch to
+	 * fixed positioning tied to their item by CSS anchor positioning (no JS). Where anchors are
+	 * unsupported the tooltip is clipped on these screens; labels stay in the DOM regardless.
+	 */
+	@media (min-width: 900px) and (max-height: 800px) {
+		.shell[data-nav='collapsed'] .scroller {
+			overflow-y: auto;
+			overflow-x: hidden;
+			scrollbar-width: thin;
+		}
+		@supports (anchor-name: --x) {
+			.shell[data-nav='collapsed'] .scroller {
+				overflow-x: visible;
+			}
+			.shell[data-nav='collapsed'] .tip {
+				position: fixed;
+				top: anchor(center);
+				left: anchor(right);
+				margin-inline-start: var(--sp-2);
+			}
 		}
 	}
 </style>

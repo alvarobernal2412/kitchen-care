@@ -168,7 +168,7 @@
 {#if data.user.role === 'admin'}
 	<section>
 		<h3>Admin</h3>
-		<a href={resolve('/admin/review')}>Admin</a>
+		<a href={resolve('/admin/review')}>Open admin</a>
 	</section>
 {/if}
 

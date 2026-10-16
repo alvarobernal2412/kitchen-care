@@ -1,7 +1,16 @@
 import { expect, test, type Page } from '@playwright/test';
+import { eq } from 'drizzle-orm';
 import { E2E_ORIGIN } from './env';
 import * as schema from '../../src/lib/server/db/schema';
-import { createUser, db, getUser, giveSession, loginAsAdmin, loginAsNewUser } from './helpers';
+import {
+	createUser,
+	db,
+	dropSessions,
+	getUser,
+	giveSession,
+	loginAsAdmin,
+	loginAsNewUser
+} from './helpers';
 
 const PHONE = { width: 390, height: 844 };
 const LAPTOP = { width: 1280, height: 800 };
@@ -9,6 +18,18 @@ const LAPTOP = { width: 1280, height: 800 };
 const mainNav = (page: Page) => page.getByRole('navigation', { name: 'Main' });
 const toggle = (page: Page) =>
 	page.getByRole('button', { name: /^(Collapse|Expand) sidebar$/ });
+
+/** The `--surface` token as the browser resolves it right now (follows light/dark and the CSS). */
+async function surfaceColor(page: Page) {
+	return page.evaluate(() => {
+		const probe = document.createElement('div');
+		probe.style.backgroundColor = 'var(--surface)';
+		document.body.append(probe);
+		const color = getComputedStyle(probe).backgroundColor;
+		probe.remove();
+		return color;
+	});
+}
 
 async function widthOf(page: Page, selector: string) {
 	return page.locator(selector).first().evaluate((el) => el.getBoundingClientRect().width);
@@ -85,7 +106,7 @@ test.describe('phone', () => {
 		const box = await sections.getByRole('link', { name: 'Users' }).boundingBox();
 		expect(box!.height).toBeGreaterThanOrEqual(44);
 		await page.goto('/profile');
-		await expect(page.getByRole('link', { name: 'Admin', exact: true })).toBeVisible();
+		await expect(page.getByRole('link', { name: 'Open admin' })).toBeVisible();
 		await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
 	});
 
@@ -93,7 +114,7 @@ test.describe('phone', () => {
 		await loginAsNewUser(page);
 		await page.goto('/profile');
 		await expect(page.getByRole('heading', { name: 'Profile', exact: true })).toBeVisible();
-		await expect(page.getByRole('link', { name: 'Admin', exact: true })).toHaveCount(0);
+		await expect(page.getByRole('link', { name: 'Open admin' })).toHaveCount(0);
 		await expect(page.getByRole('navigation', { name: 'Admin sections' })).toHaveCount(0);
 	});
 
@@ -102,7 +123,7 @@ test.describe('phone', () => {
 		const page = await context.newPage();
 		await loginAsNewUser(page);
 		await page.goto('/');
-		await expect(mainNav(page)).toHaveCSS('background-color', 'rgb(24, 33, 28)');
+		await expect(mainNav(page)).toHaveCSS('background-color', await surfaceColor(page));
 		await context.close();
 	});
 });
@@ -227,10 +248,18 @@ test.describe('laptop sidebar', () => {
 		const [task] = await db.select().from(schema.tasks).limit(1);
 		const { username } = await createUser();
 		const student = await getUser(username);
-		await db
+		const [pending] = await db
 			.insert(schema.submissions)
-			.values({ userId: student.id, taskKey: task.key, status: 'pending' });
+			.values({ userId: student.id, taskKey: task.key, status: 'pending' })
+			.returning({ id: schema.submissions.id });
+		try {
+			await checkAdminGroup(page);
+		} finally {
+			await db.delete(schema.submissions).where(eq(schema.submissions.id, pending.id));
+		}
+	});
 
+	async function checkAdminGroup(page: Page) {
 		await loginAsAdmin(page);
 		await page.goto('/admin/review');
 		const nav = mainNav(page);
@@ -251,15 +280,94 @@ test.describe('laptop sidebar', () => {
 		await expect(studentPage.getByRole('link', { name: 'Periods' })).toHaveCount(0);
 		await expect(studentPage.getByText('Admin', { exact: true })).toHaveCount(0);
 		await other.close();
-	});
+	}
 
 	test('dark mode paints the sidebar with the dark surface token', async ({ browser }) => {
 		const context = await browser.newContext({ viewport: LAPTOP, colorScheme: 'dark' });
 		const page = await context.newPage();
 		await loginAsNewUser(page);
 		await page.goto('/');
-		await expect(page.locator('#sidebar')).toHaveCSS('background-color', 'rgb(24, 33, 28)');
+		const surface = await surfaceColor(page);
+		expect(surface).not.toBe('rgb(248, 250, 246)'); // the light token: dark mode really applied
+		await expect(page.locator('#sidebar')).toHaveCSS('background-color', surface);
 		await context.close();
+	});
+});
+
+test.describe('short laptop screen (1280x640), admin', () => {
+	test.use({ viewport: { width: 1280, height: 640 } });
+
+	for (const state of ['expanded', 'collapsed'] as const) {
+		test(`the toggle and Sign out stay reachable (${state})`, async ({ page }) => {
+			await loginAsAdmin(page);
+			await page.context().addCookies([{ name: 'kc_nav', value: state, url: E2E_ORIGIN }]);
+			await page.goto('/');
+			const inView = async (loc: ReturnType<Page['locator']>) => {
+				const box = (await loc.boundingBox())!;
+				expect(box.y).toBeGreaterThanOrEqual(0);
+				expect(box.y + box.height).toBeLessThanOrEqual(640);
+				expect(box.x + box.width).toBeLessThanOrEqual(1280);
+			};
+
+			// The toggle sits under the brand, always in view, and works from the keyboard.
+			await inView(toggle(page));
+			await toggle(page).focus();
+			await page.keyboard.press('Enter');
+			const flipped = state === 'expanded' ? 'false' : 'true';
+			await expect(toggle(page)).toHaveAttribute('aria-expanded', flipped);
+			await inView(toggle(page));
+			await page.keyboard.press('Enter'); // back to the state under test
+			await expect(toggle(page)).toHaveAttribute(
+				'aria-expanded',
+				state === 'expanded' ? 'true' : 'false'
+			);
+
+			// Sign out is below the fold but reachable by scrolling and by keyboard focus.
+			const signOut = page.locator('#sidebar').getByRole('button', { name: 'Sign out' });
+			await signOut.focus();
+			await inView(signOut);
+			await signOut.click();
+			await expect(page).toHaveURL(/\/login/);
+		});
+	}
+
+	test('the rail is scrollable and a tooltip is not clipped by it', async ({ page }) => {
+		await loginAsAdmin(page);
+		await page.context().addCookies([{ name: 'kc_nav', value: 'collapsed', url: E2E_ORIGIN }]);
+		await page.goto('/');
+		const scroller = page.locator('#sidebar .scroller');
+		expect(await scroller.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
+		const link = mainNav(page).getByRole('link', { name: 'Feed' });
+		await link.hover();
+		const tip = link.locator('.tip');
+		await expect(tip).toBeVisible();
+		const box = (await tip.boundingBox())!;
+		const rail = (await page.locator('#sidebar').boundingBox())!;
+		// Mostly outside the rail, so the scrolling box is not clipping it.
+		expect(box.x + box.width).toBeGreaterThan(rail.x + rail.width + 20);
+		// Fixed positioning (anchored to its item) is what lets it escape the scrolling rail.
+		await expect(tip).toHaveCSS('position', 'fixed');
+	});
+});
+
+test.describe('toggle failures', () => {
+	test.use({ viewport: LAPTOP });
+
+	test('a failing request rolls the optimistic flip back', async ({ page }) => {
+		await loginAsNewUser(page);
+		await page.goto('/');
+		await page.route('**/preferences/nav', (route) => route.fulfill({ status: 500, body: 'nope' }));
+		await toggle(page).click();
+		await expect(toggle(page)).toHaveAttribute('aria-expanded', 'true');
+		expect(await widthOf(page, '#sidebar')).toBeCloseTo(240, 0);
+	});
+
+	test('an expired session sends the user to /login without a stuck state', async ({ page }) => {
+		const { username } = await loginAsNewUser(page);
+		await page.goto('/');
+		await dropSessions(username);
+		await toggle(page).click();
+		await expect(page).toHaveURL(/\/login/);
 	});
 });
 
