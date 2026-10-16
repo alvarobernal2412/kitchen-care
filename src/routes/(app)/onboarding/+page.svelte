@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 
 	let { data } = $props();
 
@@ -12,6 +12,13 @@
 
 	const last = $derived(step === STEPS - 1);
 	const show = (i: number) => !js || step === i;
+
+	/** Moves a step and puts focus on the new step's heading, so the swapped buttons never drop it. */
+	async function go(delta: number) {
+		step += delta;
+		await tick();
+		document.getElementById(`s${step + 1}`)?.focus();
+	}
 
 	function markDone() {
 		// Only a client-side hint: the server decides from the DB flag.
@@ -40,7 +47,7 @@
 
 		{#if show(0)}
 			<section aria-labelledby="s1">
-				<h2 id="s1">How credits work</h2>
+				<h2 id="s1" tabindex="-1">How credits work</h2>
 				<p class="lead">Log a chore in up to three taps and earn credits. Bigger jobs pay more.</p>
 				<ul class="pts-list">
 					{#each data.tasks as t (t.key)}
@@ -60,7 +67,7 @@
 
 		{#if show(1)}
 			<section aria-labelledby="s2">
-				<h2 id="s2">Your karma</h2>
+				<h2 id="s2" tabindex="-1">Your karma</h2>
 				<p class="lead">
 					Credits are your karma. Everything you do for the kitchen adds up and shows on the
 					leaderboard, so every small favor counts.
@@ -70,7 +77,7 @@
 
 		{#if show(2)}
 			<section aria-labelledby="s3">
-				<h2 id="s3">The semester prize</h2>
+				<h2 id="s3" tabindex="-1">The semester prize</h2>
 				<p class="lead">
 					When the period ends, the group chips in for a prize for the top contributor. If several
 					people tie for first place, they share the win.
@@ -80,13 +87,13 @@
 
 		<div class="actions">
 			{#if js && !last}
-				<button type="button" class="btn btn-primary btn-block" onclick={() => step++}>Next</button>
+				<button type="button" class="btn btn-primary btn-block" onclick={() => go(1)}>Next</button>
 			{:else}
 				<button type="submit" class="btn btn-primary btn-block">Get started</button>
 			{/if}
 			<div class="more">
 				{#if js && step > 0}
-					<button type="button" class="plain" onclick={() => step--}>Back</button>
+					<button type="button" class="plain" onclick={() => go(-1)}>Back</button>
 				{/if}
 				<button type="submit" class="plain">Skip</button>
 			</div>
@@ -96,7 +103,7 @@
 
 <style>
 	.page {
-		max-width: 480px;
+		max-width: 26rem;
 		margin: 0 auto;
 		padding: var(--sp-5) 0 var(--sp-6);
 	}
