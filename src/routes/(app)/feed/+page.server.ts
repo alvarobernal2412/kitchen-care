@@ -13,10 +13,14 @@ import { hit } from '$lib/server/ratelimit';
 import type { Actions, PageServerLoad } from './$types';
 
 const PAGE_SIZE = 20;
+const CURSOR_FUTURE_SLACK_MS = 24 * 60 * 60 * 1000;
 
 const cursorSchema = z.object({
-	before: z.iso.datetime().transform((s) => new Date(s)),
-	beforeId: z.coerce.number().int().positive().optional()
+	before: z.iso
+		.datetime()
+		.transform((s) => new Date(s))
+		.refine((d) => d.getTime() >= 0 && d.getTime() <= Date.now() + CURSOR_FUTURE_SLACK_MS),
+	beforeId: z.coerce.number().int().positive().max(2_147_483_647).optional()
 });
 
 export const load: PageServerLoad = async ({ locals, url }) => {
