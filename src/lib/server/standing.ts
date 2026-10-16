@@ -11,6 +11,8 @@ export type Standing = {
 	ofTotal: number;
 	/** Points between the user and first place; 0 when the user is in (or shares) first place. */
 	behindFirst: number;
+	/** How many people hold first place (more than 1 means a tie); 0 on an empty board. */
+	leaders: number;
 };
 
 /**
@@ -30,7 +32,8 @@ export async function getUserStanding(
 		points: mine?.points ?? 0,
 		rank: mine?.rank ?? null,
 		ofTotal: board.length,
-		behindFirst: mine ? first - mine.points : first
+		behindFirst: mine ? first - mine.points : first,
+		leaders: board.filter((r) => r.rank === 1).length
 	};
 }
 

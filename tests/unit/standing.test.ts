@@ -70,19 +70,22 @@ describe('getUserStanding', () => {
 			points: 10,
 			rank: 1,
 			ofTotal: 3,
-			behindFirst: 0
+			behindFirst: 0,
+			leaders: 2
 		});
 		expect(await getUserStanding(t.db, b, periodId)).toEqual({
 			points: 10,
 			rank: 1,
 			ofTotal: 3,
-			behindFirst: 0
+			behindFirst: 0,
+			leaders: 2
 		});
 		expect(await getUserStanding(t.db, c, periodId)).toEqual({
 			points: 4,
 			rank: 3,
 			ofTotal: 3,
-			behindFirst: 6
+			behindFirst: 6,
+			leaders: 2
 		});
 	});
 
@@ -96,7 +99,8 @@ describe('getUserStanding', () => {
 			points: 0,
 			rank: null,
 			ofTotal: 1,
-			behindFirst: 7
+			behindFirst: 7,
+			leaders: 1
 		});
 	});
 
@@ -111,7 +115,8 @@ describe('getUserStanding', () => {
 			points: 6,
 			rank: 2,
 			ofTotal: 2,
-			behindFirst: 4
+			behindFirst: 4,
+			leaders: 1
 		});
 	});
 
@@ -121,7 +126,8 @@ describe('getUserStanding', () => {
 			points: 0,
 			rank: null,
 			ofTotal: 0,
-			behindFirst: 0
+			behindFirst: 0,
+			leaders: 0
 		});
 	});
 
