@@ -90,7 +90,17 @@ describe('getLeaderboard', () => {
 		await award(a, 9, { status: 'rejected' });
 		await award(b, 7, { status: 'pending' });
 		const board = await getLeaderboard(t.db, periodId);
-		expect(board).toEqual([{ userId: a, username: 'alice', avatar: null, points: 5, rank: 1 }]);
+		expect(board).toEqual([
+			{
+				userId: a,
+				username: 'alice',
+				avatar: null,
+				classification: 'Student',
+				department: null,
+				points: 5,
+				rank: 1
+			}
+		]);
 	});
 
 	it('filters by department and by classification', async () => {

@@ -104,7 +104,7 @@ test('uploading and removing an avatar', async ({ page }) => {
 	// Used on the leaderboard too.
 	await page.goto('/leaderboard');
 	const row = page.getByRole('listitem').filter({ hasText: username });
-	await expect(row.locator('img.avatar')).toHaveAttribute('src', `/media/${stored}`);
+	await expect(row.locator('.avatar img')).toHaveAttribute('src', `/media/${stored}`);
 
 	// Replacing deletes the old file's reference.
 	await page.goto('/profile');
@@ -124,7 +124,7 @@ test('uploading and removing an avatar', async ({ page }) => {
 	expect((await getUser(username)).avatarPath).toBeNull();
 	await page.goto('/leaderboard');
 	await expect(
-		page.getByRole('listitem').filter({ hasText: username }).locator('img.avatar')
+		page.getByRole('listitem').filter({ hasText: username }).locator('.avatar img')
 	).toHaveCount(0);
 });
 

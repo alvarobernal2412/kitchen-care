@@ -11,6 +11,8 @@ export type LeaderboardRow = {
 	userId: number;
 	username: string;
 	avatar: string | null;
+	classification: string | null;
+	department: string | null;
 	points: number;
 	rank: number;
 };
@@ -39,12 +41,20 @@ export async function getLeaderboard(
 			userId: users.id,
 			username: users.displayUsername,
 			avatar: users.avatarPath,
+			classification: users.classification,
+			department: users.department,
 			points: points.as('points')
 		})
 		.from(submissions)
 		.innerJoin(users, eq(users.id, submissions.userId))
 		.where(and(...conds))
-		.groupBy(users.id, users.displayUsername, users.avatarPath)
+		.groupBy(
+			users.id,
+			users.displayUsername,
+			users.avatarPath,
+			users.classification,
+			users.department
+		)
 		.having(sql`sum(${submissions.pointsAwarded}) > 0`)
 		.as('agg');
 
@@ -53,6 +63,8 @@ export async function getLeaderboard(
 			userId: agg.userId,
 			username: agg.username,
 			avatar: agg.avatar,
+			classification: agg.classification,
+			department: agg.department,
 			points: agg.points,
 			rank: sql<number>`rank() over (order by ${agg.points} desc)::int`
 		})
