@@ -2,6 +2,7 @@ import { fail } from '@sveltejs/kit';
 import { z } from 'zod';
 import { requireAdmin } from '$lib/server/auth/session';
 import { getDb } from '$lib/server/db';
+import { onMilestonePost } from '$lib/server/feed';
 import {
 	AlreadyReviewedError,
 	PeriodClosedError,
@@ -65,7 +66,9 @@ export const actions: Actions = {
 		const parsed = approveSchema.safeParse(Object.fromEntries(await request.formData()));
 		if (!parsed.success) return fail(400, { error: 'Invalid submission.' });
 		try {
-			await approve(getDb(), admin.id, parsed.data.submissionId);
+			await approve(getDb(), admin.id, parsed.data.submissionId, {
+				onMilestone: onMilestonePost
+			});
 		} catch (err) {
 			return reviewError(err, parsed.data.submissionId);
 		}
