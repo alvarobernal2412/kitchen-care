@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getTestDb, type TestDb } from '../helpers/testDb';
 import { comments, posts, reactions, users } from '../../src/lib/server/db/schema';
+import { EMOJIS, EMOJI_NAMES, reactionLabel } from '../../src/lib/emoji';
 import { createPost } from '../../src/lib/server/feed';
 import { resetRateLimits } from '../../src/lib/server/ratelimit';
 
@@ -148,6 +149,24 @@ describe('DELETE endpoints', () => {
 	});
 });
 
+describe('reaction buttons accessibility', () => {
+	it('every emoji has a human name and an accessible label', () => {
+		for (const e of EMOJIS) {
+			expect(EMOJI_NAMES[e].length).toBeGreaterThan(0);
+			expect(reactionLabel(e, 3)).toBe(`${EMOJI_NAMES[e]}, 3 reactions`);
+		}
+		expect(reactionLabel('👏', 1)).toBe('Clap, 1 reaction');
+		expect(reactionLabel('👏', 0)).toBe('Clap, 0 reactions');
+	});
+
+	it('the button in Reactions.svelte sets aria-label from reactionLabel and aria-pressed', async () => {
+		const src = await readFile('src/lib/components/Reactions.svelte', 'utf8');
+		expect(src).toMatch(/<button[^>]*aria-label=\{reactionLabel\(emoji, current\[emoji\]\)\}/s);
+		expect(src).toMatch(/<button[^>]*aria-pressed=/s);
+		expect(src).toMatch(/<button[^>]*disabled=\{pending\}/s);
+	});
+});
+
 describe('feed UI safety', () => {
 	it('never renders user content with {@html}', async () => {
 		for (const f of [
@@ -207,5 +226,22 @@ describe('feed page', () => {
 		expect(second.next).toBeNull();
 		// garbage cursor falls back to the first page
 		expect((await run('http://localhost/feed?before=nope')).posts).toHaveLength(20);
+		const ok = 'before=2026-10-16T00:00:00Z';
+		for (const q of [
+			`${ok}&beforeId=99999999999`,
+			`${ok}&beforeId=2147483648`,
+			`${ok}&beforeId=-5`,
+			`${ok}&beforeId=0`,
+			`${ok}&beforeId=1.5`,
+			`${ok}&beforeId=abc`,
+			'before=0000-01-01T00:00:00Z',
+			'before=1969-12-31T23:59:59Z',
+			'before=9999-12-31T00:00:00Z',
+			'beforeId=5'
+		]) {
+			const r = await run(`http://localhost/feed?${q}`);
+			expect(r.paged, q).toBe(false);
+			expect(r.posts, q).toHaveLength(20);
+		}
 	});
 });

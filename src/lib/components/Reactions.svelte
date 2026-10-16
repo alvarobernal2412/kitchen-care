@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { EMOJIS, type Emoji } from '$lib/emoji';
+	import { EMOJIS, reactionLabel, type Emoji } from '$lib/emoji';
 
 	let {
 		postId,
@@ -14,7 +14,13 @@
 	let own = $state<Emoji[]>([...mine]);
 	let error = $state('');
 
+	// One request at a time per post: chips are disabled while it is in flight, so responses
+	// cannot arrive out of order and a rollback always restores the right snapshot.
+	let pending = $state(false);
+
 	async function toggle(emoji: Emoji) {
+		if (pending) return;
+		pending = true;
 		const prevCounts = { ...current };
 		const prevOwn = [...own];
 		const on = own.includes(emoji);
@@ -36,6 +42,8 @@
 			current = prevCounts;
 			own = prevOwn;
 			error = 'Could not save your reaction. Try again.';
+		} finally {
+			pending = false;
 		}
 	}
 </script>
@@ -47,6 +55,8 @@
 			class="chip"
 			class:on={own.includes(emoji)}
 			aria-pressed={own.includes(emoji)}
+			aria-label={reactionLabel(emoji, current[emoji])}
+			disabled={pending}
 			onclick={() => toggle(emoji)}
 		>
 			<span aria-hidden="true">{emoji}</span>
