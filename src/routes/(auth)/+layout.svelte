@@ -2,63 +2,62 @@
 	let { children } = $props();
 </script>
 
-<main>
-	<h1>Kitchen Care Credits</h1>
+<!-- Signed-out screens live outside the app shell: a calm centred column on the plaster ground. -->
+<main class="auth">
+	<p class="wordmark">Kitchen Care Credits</p>
 	{@render children()}
 </main>
 
 <style>
-	:global(body) {
-		margin: 0;
-		font-family: system-ui, sans-serif;
-		background: #f9fafb;
-		color: #111827;
-	}
-	:global(label) {
-		display: block;
-		margin-top: 1rem;
-		font-weight: 600;
-	}
-	:global(input[type='text']),
-	:global(input[type='password']),
-	:global(select) {
-		box-sizing: border-box;
-		width: 100%;
-		margin-top: 0.25rem;
-		padding: 0.7rem;
-		font: inherit;
-		border: 1px solid #d1d5db;
-		border-radius: 8px;
-		background: white;
-	}
-	:global(button) {
-		width: 100%;
-		margin-top: 1.5rem;
-		padding: 0.8rem;
-		font: inherit;
-		font-weight: 600;
-		color: white;
-		background: #1d4ed8;
-		border: 0;
-		border-radius: 8px;
-		cursor: pointer;
-	}
-	:global(button:disabled) {
-		opacity: 0.6;
-	}
-	:global(.error) {
-		margin: 1rem 0 0;
-		padding: 0.6rem 0.8rem;
-		color: #991b1b;
-		background: #fee2e2;
-		border-radius: 8px;
-	}
-	main {
-		max-width: 24rem;
+	.auth {
+		max-width: 26rem;
+		min-height: 100dvh;
 		margin: 0 auto;
-		padding: 2rem 1rem;
+		padding: var(--sp-7) var(--gutter) var(--sp-8);
 	}
-	h1 {
-		font-size: 1.4rem;
+	.wordmark {
+		margin-bottom: var(--sp-6);
+		font: 800 var(--fs-h2) / 1.15 var(--font-display);
+		letter-spacing: -0.02em;
+		color: var(--accent-ink);
+	}
+	/* Shared by login, sign-up and reset password. */
+	.auth :global(h1) {
+		font-size: var(--fs-h1);
+	}
+	.auth :global(.slogan) {
+		margin-top: var(--sp-2);
+		color: var(--muted);
+	}
+	.auth :global(form) {
+		display: flex;
+		flex-direction: column;
+		gap: var(--sp-4);
+		margin-top: var(--sp-5);
+	}
+	.auth :global(.alt) {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		column-gap: 0.35em;
+		min-height: 44px;
+		margin-top: var(--sp-4);
+	}
+	.auth :global(.alt a) {
+		display: inline-flex;
+		align-items: center;
+		min-height: 44px;
+	}
+	.auth :global(.submit) {
+		margin-top: var(--sp-2);
+	}
+
+	@media (min-width: 900px) {
+		.auth {
+			padding-top: 96px;
+		}
+		.wordmark {
+			font-size: 28px;
+		}
 	}
 </style>

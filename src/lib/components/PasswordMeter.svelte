@@ -1,80 +1,80 @@
 <script lang="ts">
 	import { RULE_LABELS, validatePassword, type PasswordRule } from '$lib/passwordRules';
 
-	let { password }: { password: string } = $props();
+	/**
+	 * Strength is said in words ("Weak", "Almost there", "Strong") and by how many of the four
+	 * segments are filled; colour only reinforces it. The rules still missing are listed in plain
+	 * words, so the list doubles as the password policy before anything is typed.
+	 */
+	let { password, id }: { password: string; id?: string } = $props();
 
+	const SEGMENTS = 4;
 	const rules = Object.keys(RULE_LABELS) as PasswordRule[];
 	const result = $derived(validatePassword(password));
 	const score = $derived(rules.length - result.missing.length);
-	const label = $derived(
-		password === '' ? '' : score <= 2 ? 'Weak' : score < rules.length ? 'Almost there' : 'Strong'
-	);
+	const filled = $derived(password === '' ? 0 : Math.round((score / rules.length) * SEGMENTS));
+	const label = $derived(score <= 2 ? 'Weak' : score < rules.length ? 'Almost there' : 'Strong');
 </script>
 
-<div class="meter" aria-live="polite">
-	<div class="bar" role="presentation">
-		<div
-			class="fill"
-			class:weak={score <= 2}
-			class:mid={score > 2 && score < rules.length}
-			class:strong={score === rules.length}
-			style:width="{password === '' ? 0 : (score / rules.length) * 100}%"
-		></div>
-	</div>
-	<p class="label">{label}</p>
-	<ul>
-		{#each rules as rule (rule)}
-			{@const missing = result.missing.includes(rule)}
-			<li class:ok={!missing}>
-				<span aria-hidden="true">{missing ? '○' : '✓'}</span>
-				{RULE_LABELS[rule]}
-				<span class="sr">{missing ? '(missing)' : '(met)'}</span>
-			</li>
+<div class="meter" {id} data-testid="password-meter">
+	<div class="bar" data-filled={filled} data-level={filled >= 3 ? 'good' : 'low'} aria-hidden="true">
+		{#each Array.from({ length: SEGMENTS }, (_, i) => i) as i (i)}
+			<i class:on={i < filled}></i>
 		{/each}
-	</ul>
+	</div>
+	<p class="strength" aria-live="polite">
+		{#if password !== ''}Password strength: <strong>{label}</strong>{/if}
+	</p>
+	{#if result.missing.length}
+		<p class="need">Still needed:</p>
+		<ul>
+			{#each result.missing as rule (rule)}
+				<li>{RULE_LABELS[rule]}</li>
+			{/each}
+		</ul>
+	{:else}
+		<p class="need">All rules met</p>
+	{/if}
 </div>
 
 <style>
+	.meter {
+		display: grid;
+		gap: 6px;
+		font-size: var(--fs-small);
+		line-height: 1.4;
+		color: var(--muted);
+	}
 	.bar {
-		height: 6px;
-		background: #e5e7eb;
-		border-radius: 3px;
-		overflow: hidden;
+		display: grid;
+		grid-template-columns: repeat(4, 1fr);
+		gap: 4px;
 	}
-	.fill {
-		height: 100%;
-		transition: width 0.2s;
+	.bar i {
+		height: 4px;
+		border-radius: 2px;
+		background: var(--line);
+		transition: background-color var(--dur-fast) var(--ease-out);
 	}
-	.weak {
-		background: #dc2626;
+	.bar[data-level='low'] i.on {
+		background: var(--pending);
 	}
-	.mid {
-		background: #d97706;
+	.bar[data-level='good'] i.on {
+		background: var(--accent);
 	}
-	.strong {
-		background: #16a34a;
+	.strength {
+		min-height: 1.4em;
+		margin: 0;
+		color: var(--ink);
 	}
-	.label {
-		min-height: 1.2em;
-		margin: 0.25rem 0;
-		font-size: 0.85rem;
-		color: #4b5563;
+	.strength strong {
+		font-weight: 600;
+	}
+	.need {
+		margin: 0;
 	}
 	ul {
-		list-style: none;
 		margin: 0;
-		padding: 0;
-		font-size: 0.85rem;
-		color: #6b7280;
-	}
-	li.ok {
-		color: #15803d;
-	}
-	.sr {
-		position: absolute;
-		width: 1px;
-		height: 1px;
-		overflow: hidden;
-		clip-path: inset(50%);
+		padding-left: 1.2em;
 	}
 </style>

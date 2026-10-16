@@ -12,12 +12,14 @@
 		value,
 		name,
 		ariaLabel,
+		required = false,
 		onchange
 	}: {
 		options: Option[];
 		value: string;
 		name: string;
 		ariaLabel: string;
+		required?: boolean;
 		onchange?: (value: string) => void;
 	} = $props();
 
@@ -40,9 +42,10 @@
 		{#each options as o (o.value)}
 			<label class="seg-item" class:active={o.value === value}>
 				<input
-					class="visually-hidden"
+					class="seg-input"
 					type="radio"
 					{name}
+					{required}
 					value={o.value}
 					checked={o.value === value}
 					onchange={() => onchange?.(o.value)}
