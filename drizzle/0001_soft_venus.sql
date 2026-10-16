@@ -1,0 +1,2 @@
+ALTER TABLE "users" ADD CONSTRAINT "users_classification_check" CHECK ("users"."classification" in ('Student', 'Employee'));--> statement-breakpoint
+ALTER TABLE "users" ADD CONSTRAINT "users_department_check" CHECK ("users"."department" in ('Software Systems Programming and Development', 'Interactions Research Group'));

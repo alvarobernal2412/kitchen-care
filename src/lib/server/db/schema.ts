@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import {
 	boolean,
+	check,
 	index,
 	integer,
 	pgTable,
@@ -9,6 +10,11 @@ import {
 	uniqueIndex,
 	primaryKey
 } from 'drizzle-orm/pg-core';
+
+export const DEPARTMENTS = [
+	'Software Systems Programming and Development',
+	'Interactions Research Group'
+] as const;
 
 const id = () => integer('id').primaryKey().generatedAlwaysAsIdentity();
 const createdAt = () => timestamp('created_at', { withTimezone: true }).notNull().defaultNow();
@@ -23,14 +29,24 @@ export const users = pgTable(
 		role: text('role', { enum: ['user', 'admin'] })
 			.notNull()
 			.default('user'),
-		classification: text('classification', { enum: ['student', 'employee'] }),
-		department: text('department'),
+		classification: text('classification', { enum: ['Student', 'Employee'] }),
+		department: text('department', { enum: DEPARTMENTS }),
 		avatarPath: text('avatar_path'),
 		active: boolean('active').notNull().default(true),
 		onboardingCompleted: boolean('onboarding_completed').notNull().default(false),
 		createdAt: createdAt()
 	},
-	(t) => [uniqueIndex('users_username_normalized_idx').on(t.usernameNormalized)]
+	(t) => [
+		uniqueIndex('users_username_normalized_idx').on(t.usernameNormalized),
+		check(
+			'users_classification_check',
+			sql`${t.classification} in ('Student', 'Employee')`
+		),
+		check(
+			'users_department_check',
+			sql`${t.department} in ('Software Systems Programming and Development', 'Interactions Research Group')`
+		)
+	]
 );
 
 export const sessions = pgTable(
