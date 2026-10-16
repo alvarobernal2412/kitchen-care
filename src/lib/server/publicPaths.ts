@@ -13,6 +13,8 @@ const EXACT = new Set([
 	'/offline'
 ]);
 
+// Static asset trees. `/_app/` also carries SvelteKit's internal endpoints; if remote functions
+// (`/_app/remote/*`) are ever enabled, re-evaluate this entry, since they would become public.
 // Static asset trees: a conservative character set, no dot segments, no doubled slashes.
 const ASSET_TREE = /^\/(?:_app|icons|offline)\/[A-Za-z0-9_\-./]+$/;
 const FAVICON = /^\/favicon[A-Za-z0-9_\-.]*$/;
