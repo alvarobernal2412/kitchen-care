@@ -36,6 +36,7 @@
 	"dependencies": {
 		"@node-rs/argon2": "^2.2.2",
 		"drizzle-orm": "^0.45.4",
-		"postgres": "^3.4.9"
+		"postgres": "^3.4.9",
+		"zod": "^4.6.7"
 	}
 }
