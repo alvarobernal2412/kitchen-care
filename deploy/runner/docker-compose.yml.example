@@ -4,17 +4,19 @@
 # Docker-outside-of-docker: the runner talks to the host's Docker daemon through the socket, so the
 # deploy directory must be mounted at the SAME absolute path inside the container; compose then
 # resolves its bind mounts (./deploy/nginx, ./state) to paths the host daemon understands.
+# The deploy scripts need git, docker with compose, and flock (util-linux) inside this image.
 #
-# The runner is EPHEMERAL: it takes one job, then exits and must register again with a fresh
-# registration. `restart: unless-stopped` alone re-registers on the next start only if the
-# container actually restarts; supervise it with a small systemd unit (see deploy/README.md).
+# The runner is EPHEMERAL: it takes one job, exits, and must register afresh. ONE supervisor does
+# that: the systemd unit in deploy/README.md runs `docker compose up --force-recreate
+# --abort-on-container-exit` with Restart=always, so every job gets a fresh container and a fresh
+# registration. Hence `restart: "no"` here (a second restarter would race with systemd).
 name: kitchen-care-runner
 
 services:
   kitchen-care-runner:
     image: myoung34/github-runner:latest
     container_name: kitchen-care-runner
-    restart: unless-stopped
+    restart: 'no'
     mem_limit: 1g
     cpus: 1.0
     env_file: .env # ACCESS_TOKEN or RUNNER_TOKEN, see .env.example
@@ -27,6 +29,8 @@ services:
       RUNNER_WORKDIR: /tmp/kitchen-care-runner
       # git refuses to work in a clone owned by another user ("dubious ownership"); the runner
       # runs as root in the container while the clone belongs to whoever created it on the host.
+      # Change this path together with the mount below (and the DEPLOY_DIR variable) if the clone
+      # is not in /opt/kitchen-care.
       GIT_CONFIG_COUNT: '1'
       GIT_CONFIG_KEY_0: safe.directory
       GIT_CONFIG_VALUE_0: /opt/kitchen-care
@@ -38,5 +42,6 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       # The deploy clone, at the same path inside and outside the container.
       - /opt/kitchen-care:/opt/kitchen-care
-      # Optional: only if the repository is private and the clone uses an SSH deploy key.
-      - /root/.ssh:/root/.ssh:ro
+      # Optional, only if the repository is private and the clone uses an SSH deploy key: put a
+      # copy of just that key (and known_hosts) in ./ssh, not the whole of /root/.ssh.
+      # - ./ssh:/root/.ssh:ro
