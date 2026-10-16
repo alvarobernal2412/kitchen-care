@@ -8,6 +8,9 @@
 	<a class="brand" href={resolve('/')}>Kitchen Care Credits</a>
 	<nav>
 		<a href={resolve('/admin/periods')}>Periods</a>
+		<a href={resolve('/admin/review')}>
+			Review{#if data.pendingCount > 0}<span class="badge">{data.pendingCount}</span>{/if}
+		</a>
 	</nav>
 	<span>{data.user.displayUsername}</span>
 </header>
@@ -59,7 +62,17 @@
 		flex: 1;
 	}
 	nav a {
+		margin-right: 1rem;
 		color: #1d4ed8;
+	}
+	.badge {
+		margin-left: 0.3rem;
+		padding: 0.05rem 0.45rem;
+		font-size: 0.8rem;
+		font-weight: 700;
+		color: white;
+		background: #b91c1c;
+		border-radius: 999px;
 	}
 	main {
 		max-width: 40rem;
