@@ -15,6 +15,7 @@ playwright-report
 docs
 tests
 deploy
+state
 compose*.yml
 Dockerfile
 .dockerignore

@@ -6,7 +6,8 @@
 #   .env: COMPOSE_PROJECT_NAME=kitchen-care-local, COMPOSE_PATH_SEPARATOR=:,
 #         COMPOSE_FILE=compose.yml:deploy/local/compose.local.yml, NPM_NETWORK=npm-sim, ...
 #   docker compose --profile sim up -d npm-sim     # reachable at http://127.0.0.1:8080
-#   docker compose --profile '*' down -v           # tear everything down
+#   docker compose -p kitchen-care-local --profile '*' down -v   # tear down (deletes the LOCAL data)
+name: kitchen-care-local # never the production project name: it selects the data volumes
 services:
   npm-sim:
     image: nginx:1.28-alpine
