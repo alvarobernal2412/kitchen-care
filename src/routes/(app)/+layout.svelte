@@ -10,6 +10,7 @@
 		<a href={resolve('/feed')}>Feed</a>
 		<a href={resolve('/leaderboard')}>Leaderboard</a>
 		<a href={resolve('/history')}>History</a>
+		<a href={resolve('/profile')}>Profile</a>
 		{#if data.user.role === 'admin'}<a href={resolve('/admin/periods')}>Admin</a>{/if}
 	</nav>
 	<form method="POST" action="/logout">

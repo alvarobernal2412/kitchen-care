@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import type { FeedPost } from '$lib/feedTypes';
 	import { timeAgo } from '$lib/relativeTime';
+	import { avatarUrl } from '$lib/avatar';
 	import Comments from './Comments.svelte';
 	import Reactions from './Reactions.svelte';
 
@@ -36,8 +37,8 @@
 {#if !gone}
 	<article class:milestone={post.milestone}>
 		<header>
-			{#if post.author.avatar}
-				<img class="avatar" src={post.author.avatar} alt="" />
+			{#if avatarUrl(post.author.avatar)}
+				<img class="avatar" src={avatarUrl(post.author.avatar)} alt="" />
 			{:else}
 				<span class="avatar fallback" aria-hidden="true">{initials(post.author.username)}</span>
 			{/if}

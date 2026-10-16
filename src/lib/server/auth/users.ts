@@ -12,7 +12,8 @@ export type AuthErrorCode =
 	| 'invalid_classification'
 	| 'department_required'
 	| 'username_taken'
-	| 'invalid_credentials';
+	| 'invalid_credentials'
+	| 'wrong_password';
 
 export class AuthError extends Error {
 	constructor(

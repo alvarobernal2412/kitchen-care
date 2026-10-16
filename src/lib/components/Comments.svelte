@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { avatarUrl } from '$lib/avatar';
 	import type { FeedComment } from '$lib/feedTypes';
 	import { timeAgo } from '$lib/relativeTime';
 
@@ -89,8 +90,8 @@
 		<ul>
 			{#each list as c (c.id)}
 				<li>
-					{#if c.author.avatar}
-						<img class="avatar" src={c.author.avatar} alt="" />
+					{#if avatarUrl(c.author.avatar)}
+						<img class="avatar" src={avatarUrl(c.author.avatar)} alt="" />
 					{:else}
 						<span class="avatar fallback" aria-hidden="true">{initials(c.author.username)}</span>
 					{/if}

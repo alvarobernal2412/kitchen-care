@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { avatarUrl } from '$lib/avatar';
+
 	let { data } = $props();
 
 	const initials = (name: string) => name.slice(0, 2).toUpperCase();
@@ -41,8 +43,8 @@
 		{#each data.rows as row (row.userId)}
 			<li class:me={row.userId === data.meId}>
 				<span class="rank">{row.rank}</span>
-				{#if row.avatar}
-					<img class="avatar" src={row.avatar} alt="" />
+				{#if avatarUrl(row.avatar)}
+					<img class="avatar" src={avatarUrl(row.avatar)} alt="" />
 				{:else}
 					<span class="avatar fallback" aria-hidden="true">{initials(row.username)}</span>
 				{/if}

@@ -10,7 +10,7 @@ export const SESSION_COOKIE = 'kc_session';
 export const SESSION_MAX_AGE_SECONDS = 90 * 24 * 60 * 60;
 
 /** Only this digest is stored; a DB leak therefore does not yield usable session ids. */
-function hashSessionId(sessionId: string): string {
+export function hashSessionId(sessionId: string): string {
 	return createHash('sha256').update(sessionId).digest('hex');
 }
 
