@@ -35,7 +35,7 @@ if [ "${BACKUP_UPLOADS:-0}" = 1 ] || [ "$(date -u +%u)" = 7 ]; then
 	ACTIVE=$(active_color)
 	[ -n "$ACTIVE" ] || die "no active app container to read uploads from"
 	UP="$BACKUP_DIR/uploads-$STAMP.tar.gz"
-	docker compose exec -T "app-$ACTIVE" tar -czf - -C /data uploads >"$UP.partial" || die "uploads tar failed"
+	docker compose exec -T "kitchen-care-app-$ACTIVE" tar -czf - -C /data uploads >"$UP.partial" || die "uploads tar failed"
 	mv "$UP.partial" "$UP"
 	log "wrote $UP"
 	# shellcheck disable=SC2012

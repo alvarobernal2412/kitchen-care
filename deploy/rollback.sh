@@ -10,23 +10,25 @@ cd "$(dirname "$0")/.."
 
 validate_env
 with_lock
+start_logging
 
 CUR=$(active_color)
 [ -n "$CUR" ] || die "no active colour recorded; nothing to roll back"
 PREV=$(other_color "$CUR")
-[ -n "$(container_id "$PREV")" ] || die "app-$PREV no longer exists; redeploy an older image tag with deploy.sh instead"
+[ -n "$(container_id "$PREV")" ] || die "kitchen-care-app-$PREV no longer exists; redeploy an older image tag with deploy.sh instead"
 
 write_realip
 docker compose up -d --wait postgres >/dev/null
-log "starting app-$PREV"
-docker compose up -d --no-deps "app-$PREV" >/dev/null
+log "starting kitchen-care-app-$PREV"
+PENDING_STOP=$PREV
+docker compose up -d --no-deps "kitchen-care-app-$PREV" >/dev/null
 if ! wait_healthy "$PREV"; then
-	docker compose logs --tail 30 "app-$PREV" || true
-	docker compose stop "app-$PREV" >/dev/null 2>&1 || true
-	die "app-$PREV is not healthy; $CUR keeps serving"
+	docker compose logs --tail 30 "kitchen-care-app-$PREV" || true
+	die "kitchen-care-app-$PREV is not healthy; $CUR keeps serving"
 fi
-switch_traffic "$PREV" "$CUR" || { docker compose stop "app-$PREV" >/dev/null 2>&1 || true; die "switch failed; $CUR keeps serving"; }
+switch_traffic "$PREV" "$CUR" || die "switch failed; $CUR keeps serving"
 printf '%s\n' "$PREV" >"$STATE_DIR/active"
-sleep "${DRAIN_SECONDS:-10}"
-docker compose stop "app-$CUR" >/dev/null
-log "rolled back: app-$PREV is live, app-$CUR stopped"
+PENDING_STOP=""
+sleep "$(env_num DRAIN_SECONDS 10)"
+docker compose stop "kitchen-care-app-$CUR" >/dev/null
+log "rolled back: kitchen-care-app-$PREV is live, kitchen-care-app-$CUR stopped"
