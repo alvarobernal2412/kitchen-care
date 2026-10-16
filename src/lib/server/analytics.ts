@@ -111,6 +111,24 @@ export async function getActivity(
 	}));
 }
 
+/** Totals over [from, to); activeUsers is distinct over the whole range. */
+export async function getRangeTotals(
+	db: Pick<Db, 'execute'>,
+	range: { from: Date; to: Date }
+): Promise<{ opens: number; activeUsers: number; submissions: number }> {
+	assertRange(range.from, range.to, 3660);
+	const [row] = await db.execute<{ opens: number; active_users: number; submissions: number }>(sql`
+		select
+			(count(*) filter (where type = 'app_open'))::int as opens,
+			count(distinct user_id)::int as active_users,
+			(count(*) filter (where type = 'task_submitted'))::int as submissions
+		from events
+		where created_at >= ${range.from.toISOString()}::timestamptz
+			and created_at < ${range.to.toISOString()}::timestamptz
+	`);
+	return { opens: row.opens, activeUsers: row.active_users, submissions: row.submissions };
+}
+
 /**
  * 7x24 matrix [weekday Mon=0..Sun=6][hour 0..23] of task_submitted events in [from, to),
  * in `tz`. Always the full shape, zero-filled.

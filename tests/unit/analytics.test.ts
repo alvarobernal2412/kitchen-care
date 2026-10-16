@@ -6,6 +6,7 @@ import {
 	InvalidRangeError,
 	getActivity,
 	getHeatmap,
+	getRangeTotals,
 	getTaskDistribution,
 	getTopContributors,
 	resolveTimezone
@@ -170,6 +171,33 @@ describe('getActivity', () => {
 		const to = new Date(from.getTime() + 400 * 86_400_000);
 		const res = await getActivity(t.db, { from, to, bucket: 'day' });
 		expect(res).toHaveLength(400);
+	});
+});
+
+describe('getRangeTotals', () => {
+	it('counts distinct users over the whole range, not per bucket', async () => {
+		await ev(u1, 'app_open', '2026-10-12T08:00:00Z');
+		await ev(u1, 'app_open', '2026-10-13T08:00:00Z'); // same user on another day
+		await ev(u2, 'task_submitted', '2026-10-13T09:00:00Z');
+		await ev(u2, 'app_open', '2026-10-20T09:00:00Z'); // outside
+		const res = await getRangeTotals(t.db, {
+			from: D('2026-10-12T00:00:00Z'),
+			to: D('2026-10-14T00:00:00Z')
+		});
+		expect(res).toEqual({ opens: 2, activeUsers: 2, submissions: 1 });
+	});
+
+	it('is all zeros for an empty range and rejects invalid ones', async () => {
+		const from = D('2026-10-12T00:00:00Z');
+		const to = D('2026-10-14T00:00:00Z');
+		expect(await getRangeTotals(t.db, { from, to })).toEqual({
+			opens: 0,
+			activeUsers: 0,
+			submissions: 0
+		});
+		await expect(getRangeTotals(t.db, { from: to, to: from })).rejects.toBeInstanceOf(
+			InvalidRangeError
+		);
 	});
 });
 
