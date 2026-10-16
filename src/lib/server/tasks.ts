@@ -1,5 +1,6 @@
 import { and, desc, eq, ne, sql } from 'drizzle-orm';
 import type { Db } from './db';
+import { deleteUpload, processUpload } from './images';
 import { events, periods, submissions, tasks, users } from './db/schema';
 
 export type Submission = typeof submissions.$inferSelect;
@@ -165,4 +166,123 @@ export async function getUserPeriodTotal(db: Db, userId: number, periodId: numbe
 			)
 		);
 	return row.total;
+}
+
+export class NotAReviewTaskError extends Error {
+	constructor(key: string) {
+		super(`Task ${key} does not use photo review`);
+		this.name = 'NotAReviewTaskError';
+	}
+}
+
+export class DetectionFailedError extends Error {
+	constructor() {
+		super('Cutlery was not detected');
+		this.name = 'DetectionFailedError';
+	}
+}
+
+export class TooManyPendingError extends Error {
+	constructor() {
+		super('Too many submissions are already waiting for review');
+		this.name = 'TooManyPendingError';
+	}
+}
+
+export const MAX_PENDING_PER_TASK = 3;
+
+export type PhotoOptions = { now?: Date; uploadDir?: string };
+
+/**
+ * Stores a proof photo and creates a pending submission (no points until an admin approves).
+ * The image is processed outside the DB transaction; if the insert fails the file is removed.
+ */
+export async function submitPhotoTask(
+	db: Db,
+	userId: number,
+	taskKey: string,
+	image: Buffer,
+	opts: PhotoOptions = {}
+): Promise<Submission> {
+	const now = opts.now ?? new Date();
+	const [task] = await db.select().from(tasks).where(eq(tasks.key, taskKey));
+	if (!task) throw new UnknownTaskError(taskKey);
+	if (!task.needsReview) throw new NotAReviewTaskError(taskKey);
+
+	// Cheap pre-checks so we do not decode/write an image that is certain to be refused.
+	// The authoritative checks repeat inside the transaction below.
+	const [pre] = await db.select({ active: users.active }).from(users).where(eq(users.id, userId));
+	if (!pre?.active) throw new InactiveUserError();
+	const [prePeriod] = await db
+		.select({ id: periods.id })
+		.from(periods)
+		.where(eq(periods.status, 'active'));
+	if (!prePeriod) throw new NoActivePeriodError();
+
+	const { file } = await processUpload(image, { dir: opts.uploadDir });
+	try {
+		return await db.transaction(async (tx) => {
+			await tx.execute(
+				sql`select pg_advisory_xact_lock(hashtextextended(${`pending:${userId}:${task.key}`}, 0))`
+			);
+			const [user] = await tx
+				.select({ active: users.active })
+				.from(users)
+				.where(eq(users.id, userId));
+			if (!user?.active) throw new InactiveUserError();
+			const [period] = await tx
+				.select()
+				.from(periods)
+				.where(eq(periods.status, 'active'))
+				.limit(1)
+				.for('share');
+			if (!period) throw new NoActivePeriodError();
+
+			const [{ count }] = await tx
+				.select({ count: sql<number>`count(*)::int` })
+				.from(submissions)
+				.where(
+					and(
+						eq(submissions.userId, userId),
+						eq(submissions.taskKey, task.key),
+						eq(submissions.status, 'pending')
+					)
+				);
+			if (count >= MAX_PENDING_PER_TASK) throw new TooManyPendingError();
+
+			const [row] = await tx
+				.insert(submissions)
+				.values({
+					userId,
+					taskKey: task.key,
+					periodId: period.id,
+					status: 'pending',
+					pointsAwarded: 0,
+					imagePath: file,
+					createdAt: now
+				})
+				.returning();
+			await tx.insert(events).values({ userId, type: 'task_submitted', createdAt: now });
+			return row;
+		});
+	} catch (err) {
+		await deleteUpload(file, { dir: opts.uploadDir }).catch(() => {});
+		throw err;
+	}
+}
+
+/**
+ * Cutlery is checked on the device; the server trusts `clientPassed`, stores no image, and
+ * credits through the same cooldown path as the self-reported tasks.
+ */
+export async function submitCutleryTask(
+	db: Db,
+	userId: number,
+	clientPassed: boolean,
+	opts: PhotoOptions = {}
+): Promise<Submission> {
+	if (clientPassed !== true) throw new DetectionFailedError();
+	const [task] = await db.select().from(tasks).where(eq(tasks.key, 'cutlery'));
+	if (!task) throw new UnknownTaskError('cutlery');
+	return creditAutoApprovedTask(db, userId, task, { now: opts.now });
 }
