@@ -1,5 +1,5 @@
 #!/bin/sh
-# Shared helpers for deploy.sh, rollback.sh, backup.sh and remote-deploy.sh. Sourced, not executed.
+# Shared helpers for deploy.sh, rollback.sh, backup.sh and update.sh. Sourced, not executed.
 # POSIX sh. The caller has cd'ed to the deploy root (the directory holding compose.yml and .env).
 
 # The colours and the migrate tool sit in compose profiles so a bare `docker compose up` never
@@ -163,7 +163,7 @@ proxy_ready() {
 	return 1
 }
 
-# restore_nginx_conf: put back the previous nginx files that remote-deploy.sh kept as *.prev.
+# restore_nginx_conf: put back the previous nginx files that update.sh kept as *.prev.
 restore_nginx_conf() {
 	for _f in deploy/nginx/*.prev; do
 		[ -f "$_f" ] || continue
