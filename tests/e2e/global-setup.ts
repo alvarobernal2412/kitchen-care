@@ -11,11 +11,13 @@ import {
 	E2E_DB_NAME,
 	E2E_UPLOAD_DIR,
 	adminDatabaseUrl,
+	assertLocalDatabase,
 	e2eDatabaseUrl
 } from './env';
 
 /** Drops and recreates the dedicated e2e database, then migrates and seeds it. */
 export default async function globalSetup(): Promise<void> {
+	assertLocalDatabase();
 	const admin = postgres(adminDatabaseUrl(), { max: 1, onnotice: () => {} });
 	try {
 		await admin.unsafe(`drop database if exists "${E2E_DB_NAME}" with (force)`);
