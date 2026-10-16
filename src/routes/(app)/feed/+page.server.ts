@@ -9,36 +9,24 @@ import {
 	listPosts,
 	toFeedPost
 } from '$lib/server/feed';
+import { parseFeedCursor } from '$lib/server/feedCursor';
 import { hit } from '$lib/server/ratelimit';
 import type { Actions, PageServerLoad } from './$types';
 
 const PAGE_SIZE = 20;
-const CURSOR_FUTURE_SLACK_MS = 24 * 60 * 60 * 1000;
-
-const cursorSchema = z.object({
-	before: z.iso
-		.datetime()
-		.transform((s) => new Date(s))
-		.refine((d) => d.getTime() >= 0 && d.getTime() <= Date.now() + CURSOR_FUTURE_SLACK_MS),
-	beforeId: z.coerce.number().int().positive().max(2_147_483_647).optional()
-});
-
 export const load: PageServerLoad = async ({ locals, url }) => {
-	const cursor = cursorSchema.safeParse({
-		before: url.searchParams.get('before'),
-		beforeId: url.searchParams.get('beforeId') ?? undefined
-	});
+	const cursor = parseFeedCursor(url.searchParams);
 	const page = await listPosts(getDb(), {
 		limit: PAGE_SIZE,
 		viewerId: locals.user!.id,
-		...(cursor.success ? cursor.data : {})
+		...(cursor ?? {})
 	});
 	return {
 		posts: page.posts.map(toFeedPost),
 		next: page.next
 			? { before: page.next.before.toISOString(), beforeId: page.next.beforeId }
 			: null,
-		paged: cursor.success,
+		paged: cursor !== null,
 		meId: locals.user!.id,
 		postMax: POST_MAX
 	};
