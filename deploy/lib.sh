@@ -3,14 +3,14 @@
 # POSIX sh. The caller has cd'ed to the deploy root (the directory holding compose.yml and .env).
 
 # The colours and the migrate tool sit in compose profiles so a bare `docker compose up` never
-# starts both colours; always deploy through deploy.sh.
+# starts both colours; always deploy through update.sh or deploy.sh.
 COMPOSE_PROFILES=apps,tools
 export COMPOSE_PROFILES
 
-STATE_DIR=./state
+STATE_DIR=${KC_STATE_DIR:-./state}
 NGINX_CONF=/etc/nginx/kc-static/nginx.conf
 PROXY=kitchen-care-proxy
-# shellcheck disable=SC2034  # used by deploy.sh
+# shellcheck disable=SC2034  # used by deploy.sh and update.sh
 PROJECT_LABEL=com.kitchen-care.project=kitchen-care
 
 # Variables that must be set (in .env or the environment) before any deploy. One place.
@@ -67,14 +67,36 @@ validate_env() {
 		die "docker network '$NPM_NETWORK' (NPM_NETWORK) does not exist. Find NPM's network with: docker network ls; docker inspect <npm container> --format '{{json .NetworkSettings.Networks}}'"
 }
 
+# mem_available_mb: available host memory in MB (MemAvailable), empty when it cannot be read.
+mem_available_mb() {
+	if [ -r /proc/meminfo ] && grep -q '^MemAvailable:' /proc/meminfo 2>/dev/null; then
+		awk '/^MemAvailable:/ {printf "%d", $2 / 1024}' /proc/meminfo
+	elif command -v free >/dev/null 2>&1; then
+		free -m | awk '/^Mem:/ {print $7}'
+	fi
+}
+
 # check_free_memory: the host is shared and small; two app colours briefly run side by side, so
-# refuse to start when less than MIN_FREE_MB (default 400) is available. Skipped without `free`.
+# refuse to start when less than MIN_FREE_MB (default 400) is available. Skipped when unreadable.
 check_free_memory() {
 	_min=$(env_num MIN_FREE_MB 400)
-	command -v free >/dev/null 2>&1 || return 0
-	_avail=$(free -m | awk '/^Mem:/ {print $7}')
+	_avail=$(mem_available_mb)
 	case $_avail in '' | *[!0-9]*) return 0 ;; esac
 	[ "$_avail" -ge "$_min" ] || die "only ${_avail} MB memory available (< MIN_FREE_MB=$_min); not starting a second app container. Free memory or lower MIN_FREE_MB."
+}
+
+# check_build_memory: building the image on the VPS needs headroom; refuse below MIN_BUILD_FREE_MB
+# (default 900) so the Vite build cannot starve the other apps. Skipped when unreadable.
+check_build_memory() {
+	_min=$(env_num MIN_BUILD_FREE_MB 900)
+	_avail=$(mem_available_mb)
+	case $_avail in
+		'' | *[!0-9]*)
+			warn "cannot read available memory; skipping the build memory guard"
+			return 0
+			;;
+	esac
+	[ "$_avail" -ge "$_min" ] || die "only ${_avail} MB memory available (< MIN_BUILD_FREE_MB=$_min); not building now. Retry later, stop something, or lower MIN_BUILD_FREE_MB in .env."
 }
 
 valid_cidr() {
@@ -118,7 +140,28 @@ active_color() {
 	if [ -f "$STATE_DIR/active" ]; then cat "$STATE_DIR/active"; fi
 }
 
+# set_active COLOR: record the live colour (temp file + rename, so it is never half written).
+set_active() {
+	mkdir -p "$STATE_DIR"
+	printf '%s\n' "$1" >"$STATE_DIR/.active.$$"
+	mv "$STATE_DIR/.active.$$" "$STATE_DIR/active"
+}
+
 container_id() { docker compose ps -a -q "kitchen-care-app-$1" 2>/dev/null | head -n 1; }
+
+# warn_orphans: containers of this compose project whose service no longer exists in compose.yml,
+# e.g. the generic app-blue/app-green services of earlier versions. They keep running (and keep
+# memory) until removed by hand.
+warn_orphans() {
+	_known=$(docker compose --profile '*' config --services 2>/dev/null | tr '\n' ' ')
+	[ -n "$_known" ] || return 0
+	for _s in $(docker compose ps -a --format '{{.Service}}' 2>/dev/null | sort -u); do
+		case " $_known " in
+			*" $_s "*) ;;
+			*) warn "orphan container for removed service '$_s' (an older version?). Remove it with: docker compose up -d --remove-orphans postgres kitchen-care-proxy   (or docker rm -f <container>; see docker compose ps -a)" ;;
+		esac
+	done
+}
 
 # wait_healthy COLOR: block until the container's Docker health is "healthy" or time runs out.
 wait_healthy() {
@@ -136,8 +179,9 @@ wait_healthy() {
 	return 1
 }
 
-# The colours are reachable on the private network under network-scoped aliases (see compose.yml),
-# which cannot collide with other stacks' names on the shared NPM network.
+# The colours are reachable on the private network under their compose service names, which carry
+# the project prefix so they cannot collide with other stacks' names (the app is never attached to
+# the shared NPM network).
 write_upstream() {
 	mkdir -p "$STATE_DIR"
 	# shellcheck disable=SC2016  # $kc_upstream is an nginx variable, not a shell one
@@ -163,7 +207,23 @@ proxy_ready() {
 	return 1
 }
 
-# restore_nginx_conf: put back the previous nginx files that update.sh kept as *.prev.
+# --- nginx files: last-known-good copies ----------------------------------------------------
+# deploy/nginx is bind-mounted into the proxy and arrives by `git reset`, so a bad commit changes
+# the files under a running proxy. update.sh snapshots them as *.prev first; they are restored on
+# every abort before the switch completes and dropped once the new ones are live.
+
+# snapshot_nginx_conf: leftovers from a killed run are the last known good (restore them first),
+# then copy the current files; an existing *.prev is never overwritten with unvalidated files.
+snapshot_nginx_conf() {
+	restore_nginx_conf
+	for _f in deploy/nginx/*; do
+		case $_f in *.prev) continue ;; esac
+		[ -f "$_f" ] || continue
+		cp -p "$_f" "$_f.prev"
+	done
+}
+
+# restore_nginx_conf: put back the previous nginx files kept as *.prev (no-op without any).
 restore_nginx_conf() {
 	for _f in deploy/nginx/*.prev; do
 		[ -f "$_f" ] || continue
@@ -176,7 +236,8 @@ restore_nginx_conf() {
 drop_nginx_prev() { rm -f deploy/nginx/*.prev; }
 
 # switch_traffic NEW OLD: point the proxy at NEW (already healthy). On any failure restore OLD's
-# upstream and nginx files (if there was an OLD) and return non-zero; the caller removes NEW.
+# upstream and the nginx files and return non-zero; the caller removes NEW. Without an OLD (first
+# deploy) the proxy is reloaded onto the restored files so the running config matches the disk.
 # SWITCH_ACTIVE lets the exit trap undo a half-done switch when a signal arrives mid-way.
 switch_traffic() {
 	_new=$1
@@ -187,6 +248,7 @@ switch_traffic() {
 	docker compose up -d --no-recreate "$PROXY" >/dev/null
 	if proxy_reload && proxy_ready; then
 		SWITCH_ACTIVE=0
+		SWITCH_DONE=1
 		drop_nginx_prev
 		return 0
 	fi
@@ -195,6 +257,10 @@ switch_traffic() {
 	if [ -n "$_old" ]; then
 		write_upstream "$_old"
 		proxy_reload || true
+	else
+		# First deploy: the proxy may have started on the rejected files (and be crash-looping);
+		# restart it so what runs is what is on disk.
+		docker compose restart "$PROXY" >/dev/null 2>&1 || true
 	fi
 	SWITCH_ACTIVE=0
 	return 1
@@ -202,26 +268,58 @@ switch_traffic() {
 
 # --- locking, signals, logging -------------------------------------------------------------
 
-LOCK_DIR=$STATE_DIR/.lock
-LOCK_OWNER=""
+LOCK_FILE=$STATE_DIR/.lock
+LOCK_OWNER=""       # pid if this process created the lock file (and so removes it)
+HAVE_LOCK=0         # 1 once this run is entitled to act (owner, re-entry, or told child)
 SWITCH_ACTIVE=0
+SWITCH_DONE=0
 SWITCH_OLD=""
 PENDING_REMOVE=""   # colour started by this run but not yet live: removed on abort
 PENDING_STOP=""     # colour started by a rollback but not yet live: stopped on abort
 TAIL_PID=""
+CHILD_PID=""
+
+# run_child CMD...: run a command in the background and wait for it, so a trapped INT/TERM is
+# handled immediately (a foreground child would delay the trap until it exits). cleanup forwards
+# the signal to the child and waits for it.
+run_child() {
+	"$@" &
+	CHILD_PID=$!
+	_rc=0
+	wait "$CHILD_PID" || _rc=$?
+	CHILD_PID=""
+	return "$_rc"
+}
 
 cleanup() {
+	# A run that never got the lock (refused, or interrupted while waiting) must not touch anything:
+	# the nginx files, colours and state belong to whoever holds the lock.
+	if [ "$HAVE_LOCK" != 1 ]; then
+		rm -f "$LOCK_FILE.$$"
+		return 0
+	fi
+	if [ -n "$CHILD_PID" ]; then
+		kill -TERM "$CHILD_PID" 2>/dev/null || true
+		wait "$CHILD_PID" 2>/dev/null || true
+	fi
 	# Undo a half-done switch first, so a signal never leaves the upstream on an unverified colour.
 	if [ "$SWITCH_ACTIVE" = 1 ] && [ -n "$SWITCH_OLD" ]; then
 		write_upstream "$SWITCH_OLD" 2>/dev/null || true
-		restore_nginx_conf 2>/dev/null || true
-		proxy_reload 2>/dev/null || true
 	fi
-	[ -z "$PENDING_REMOVE" ] || docker compose rm -sf "kitchen-care-app-$PENDING_REMOVE" >/dev/null 2>&1 || true
-	[ -z "$PENDING_STOP" ] || docker compose stop "kitchen-care-app-$PENDING_STOP" >/dev/null 2>&1 || true
+	# Every abort before the switch completed puts the last-known-good nginx files back.
+	if [ "$SWITCH_DONE" != 1 ]; then restore_nginx_conf 2>/dev/null || true; fi
+	if [ "$SWITCH_ACTIVE" = 1 ]; then
+		if [ -n "$SWITCH_OLD" ]; then proxy_reload 2>/dev/null || true; else docker compose restart "$PROXY" >/dev/null 2>&1 || true; fi
+	fi
+	# Once the switch succeeded the pending colour is the live one and must never be touched.
+	if [ "$SWITCH_DONE" != 1 ]; then
+		[ -z "$PENDING_REMOVE" ] || docker compose rm -sf "kitchen-care-app-$PENDING_REMOVE" >/dev/null 2>&1 || true
+		[ -z "$PENDING_STOP" ] || docker compose stop "kitchen-care-app-$PENDING_STOP" >/dev/null 2>&1 || true
+	fi
+	rm -f "$LOCK_FILE.$$"
 	# Only remove a lock this process owns.
-	if [ -n "$LOCK_OWNER" ] && [ "$(cat "$LOCK_DIR/pid" 2>/dev/null || true)" = "$LOCK_OWNER" ]; then
-		rm -rf "$LOCK_DIR"
+	if [ -n "$LOCK_OWNER" ] && [ "$(lock_pid)" = "$LOCK_OWNER" ]; then
+		rm -f "$LOCK_FILE"
 	fi
 	if [ -n "$TAIL_PID" ]; then
 		sleep 1 # let the follower print the last lines
@@ -229,36 +327,84 @@ cleanup() {
 	fi
 }
 
-# with_lock: take the deploy lock (pid + start time inside). A lock whose pid is dead is stale and
-# is recovered; a live one blocks. Also installs the signal handling for the rest of the run:
-# INT/TERM clean up and exit (the deploy never continues), HUP/PIPE are ignored so a dropped SSH
-# session does not abort a half-finished switch.
+lock_pid() { sed -n '1p' "$LOCK_FILE" 2>/dev/null || true; }
+
+# with_lock: take the deploy lock, a file "pid / start time" that is created complete and
+# atomically (written to a temp name, then hard-linked into place, which fails if it exists), so
+# there is never a lock without a pid. A lock whose pid is dead is stale; contenders recover it
+# one at a time through a "takeover" link and re-check the lock under it, so two of them can never
+# both remove it and both proceed. Exits 75 when a live deploy holds the lock.
+# The lock is re-entrant for the process that holds it (update.sh re-executes itself) and for the
+# direct child of the holder that was told so (KC_LOCK_PARENT, set by update.sh for deploy.sh).
+# Also installs the signal handling for the rest of the run: INT/TERM clean up and exit (the
+# deploy never continues), HUP/PIPE are ignored so a dropped session does not abort a half-finished
+# switch.
 with_lock() {
 	mkdir -p "$STATE_DIR"
 	trap cleanup EXIT
 	trap 'exit 130' INT
 	trap 'exit 143' TERM
 	trap '' HUP PIPE
-	if ! mkdir "$LOCK_DIR" 2>/dev/null; then
-		_pid=$(cat "$LOCK_DIR/pid" 2>/dev/null || true)
-		if [ -n "$_pid" ] && kill -0 "$_pid" 2>/dev/null; then
-			die "another deploy is running (pid $_pid, started $(cat "$LOCK_DIR/started" 2>/dev/null || echo unknown))"
+
+	_held=$(lock_pid)
+	if [ -n "$_held" ]; then
+		if [ "$_held" = "$$" ]; then
+			LOCK_OWNER=$$
+			HAVE_LOCK=1
+			return 0
 		fi
-		log "removing stale lock (pid ${_pid:-unknown} is not running)"
-		rm -rf "$LOCK_DIR"
-		mkdir "$LOCK_DIR" 2>/dev/null || die "could not take the deploy lock"
+		if [ "${KC_LOCK_PARENT:-}" = "$_held" ] && [ "$_held" = "$PPID" ]; then
+			HAVE_LOCK=1
+			return 0
+		fi
 	fi
-	LOCK_OWNER=$$
-	printf '%s\n' "$$" >"$LOCK_DIR/pid"
-	date -u +%Y-%m-%dT%H:%M:%SZ >"$LOCK_DIR/started"
+
+	_tmp="$LOCK_FILE.$$"
+	printf '%s\n%s\n' "$$" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >"$_tmp"
+	_tries=0
+	while :; do
+		if ln "$_tmp" "$LOCK_FILE" 2>/dev/null; then
+			rm -f "$_tmp"
+			LOCK_OWNER=$$
+			HAVE_LOCK=1
+			return 0
+		fi
+		_pid=$(lock_pid)
+		if [ -n "$_pid" ] && kill -0 "$_pid" 2>/dev/null; then
+			rm -f "$_tmp"
+			printf '%s\n' "deploy: ERROR: another deploy is running (pid $_pid, started $(sed -n '2p' "$LOCK_FILE" 2>/dev/null || echo unknown))" >&2
+			exit 75
+		fi
+		if [ -n "$_pid" ]; then
+			if ln "$_tmp" "$LOCK_FILE.takeover" 2>/dev/null; then
+				if [ "$(lock_pid)" = "$_pid" ]; then
+					log "removing stale lock (pid $_pid is not running)"
+					rm -f "$LOCK_FILE"
+				fi
+				rm -f "$LOCK_FILE.takeover"
+			else
+				# Someone else is recovering; if that contender died mid-way, clear its marker.
+				_tp=$(sed -n '1p' "$LOCK_FILE.takeover" 2>/dev/null || true)
+				if [ -n "$_tp" ] && ! kill -0 "$_tp" 2>/dev/null; then rm -f "$LOCK_FILE.takeover"; fi
+				sleep 1
+			fi
+		fi
+		_tries=$((_tries + 1))
+		if [ "$_tries" -ge 15 ]; then
+			rm -f "$_tmp"
+			die "could not take the deploy lock"
+		fi
+	done
 }
 
-# start_logging: from here on all output goes to state/deploy.log and is mirrored to the original
-# stdout by a follower process. If the SSH session drops, only the follower dies; the deploy
-# keeps writing to the file and finishes.
+# start_logging [NAME]: from here on all output goes to state/NAME.log (default deploy.log) and is
+# mirrored to the original stdout by a follower process. If the controlling session drops, only the
+# follower dies; the run keeps writing to the file and finishes. KC_LOGGING=1 (set by update.sh
+# for its deploy.sh child, which already writes to update.log) turns this into a no-op.
 start_logging() {
+	[ -z "${KC_LOGGING:-}" ] || return 0
 	mkdir -p "$STATE_DIR"
-	_log=$STATE_DIR/deploy.log
+	_log=$STATE_DIR/${1:-deploy}.log
 	if [ -f "$_log" ] && [ "$(wc -c <"$_log")" -gt 1048576 ]; then : >"$_log"; fi
 	: >>"$_log"
 	_off=$(wc -c <"$_log")

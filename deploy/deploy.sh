@@ -1,9 +1,10 @@
 #!/bin/sh
 # Blue/green deploy. Usage: deploy/deploy.sh <image-tag>
-# Expects the image kitchen-care-app:<image-tag> to be loaded already (docker load). Runs from any
-# directory; operates on the deploy root (parent of deploy/), where compose.yml and .env live.
+# Expects the image kitchen-care-app:<image-tag> to exist on this host (update.sh builds it, which
+# is the normal entry point). Runs from any directory; operates on the deploy root (parent of
+# deploy/), where compose.yml and .env live.
 # Failure or interruption at any step before the switch leaves the currently active colour serving.
-# Output goes to state/deploy.log as well as stdout (a dropped SSH session does not stop a deploy).
+# Output goes to state/deploy.log as well as stdout (update.sh runs this with its own log instead).
 set -eu
 
 [ $# -eq 1 ] || { echo "usage: $0 <image-tag>" >&2; exit 2; }
@@ -15,7 +16,7 @@ cd "$(dirname "$0")/.."
 
 valid_tag "$TAG" || { echo "invalid or reserved image tag" >&2; exit 2; }
 validate_env
-docker image inspect "kitchen-care-app:$TAG" >/dev/null 2>&1 || die "image kitchen-care-app:$TAG is not loaded on this host"
+docker image inspect "kitchen-care-app:$TAG" >/dev/null 2>&1 || die "image kitchen-care-app:$TAG does not exist on this host (build it with deploy/update.sh)"
 with_lock
 start_logging
 
@@ -28,6 +29,7 @@ if [ -n "$OLD" ]; then NEW=$(other_color "$OLD"); else NEW=blue; fi
 log "image=$TAG active=${OLD:-none} deploying=$NEW"
 
 check_free_memory
+warn_orphans
 write_realip
 
 # 1. Database up, then migrations with the NEW image. Abort here if they fail.
@@ -50,10 +52,12 @@ if ! wait_healthy "$NEW"; then
 	die "deploy aborted; ${OLD:-no colour} keeps serving"
 fi
 
-# 3. Switch the proxy, then drain and stop the old colour.
+# 3. Switch the proxy, then drain and stop the old colour. From the moment the switch succeeded
+# NEW is live: clear the abort marker before anything else, so a failed state write or a signal can
+# never make cleanup stop the colour that is serving.
 switch_traffic "$NEW" "$OLD" || die "could not switch the proxy to kitchen-care-app-$NEW; ${OLD:-no colour} keeps serving"
-printf '%s\n' "$NEW" >"$STATE_DIR/active"
 PENDING_REMOVE=""
+set_active "$NEW"
 log "traffic now on kitchen-care-app-$NEW"
 
 if [ -n "$OLD" ]; then

@@ -27,8 +27,8 @@ if ! wait_healthy "$PREV"; then
 	die "kitchen-care-app-$PREV is not healthy; $CUR keeps serving"
 fi
 switch_traffic "$PREV" "$CUR" || die "switch failed; $CUR keeps serving"
-printf '%s\n' "$PREV" >"$STATE_DIR/active"
 PENDING_STOP=""
+set_active "$PREV"
 sleep "$(env_num DRAIN_SECONDS 10)"
 docker compose stop "kitchen-care-app-$CUR" >/dev/null
 log "rolled back: kitchen-care-app-$PREV is live, kitchen-care-app-$CUR stopped"
