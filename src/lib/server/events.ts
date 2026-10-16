@@ -43,14 +43,15 @@ export async function recordAppOpen(
 const EXCLUDED_PREFIXES = ['/api', '/media', '/healthz', '/_app'];
 
 /**
- * True for requests that represent a person opening a page: a document GET, or the
- * SvelteKit `__data.json` fetch behind a client-side navigation. API calls, media,
- * health checks, static assets and form POSTs are not app opens.
+ * True for document (HTML page) GET requests only. App opens are counted on document
+ * navigations; SvelteKit `__data.json` fetches (preloads, invalidations after form posts)
+ * would inflate the count, so they are excluded, as are API calls, media, health checks,
+ * static assets and form POSTs.
  */
 export function shouldRecordAppOpen(request: Request, url: URL): boolean {
 	if (request.method !== 'GET') return false;
 	const p = url.pathname;
 	if (EXCLUDED_PREFIXES.some((x) => p === x || p.startsWith(`${x}/`))) return false;
-	if (p.endsWith('/__data.json')) return true;
+	if (p.endsWith('/__data.json')) return false;
 	return (request.headers.get('accept') ?? '').includes('text/html');
 }

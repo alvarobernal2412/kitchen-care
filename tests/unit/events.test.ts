@@ -83,8 +83,9 @@ describe('shouldRecordAppOpen', () => {
 		expect(should('/leaderboard?x=1')).toBe(true);
 		expect(should('/admin/analytics')).toBe(true);
 	});
-	it('accepts SvelteKit client-navigation data requests', () => {
-		expect(should('/leaderboard/__data.json', 'GET', '*/*')).toBe(true);
+	it('rejects SvelteKit data requests, even if they accept html', () => {
+		expect(should('/leaderboard/__data.json', 'GET', '*/*')).toBe(false);
+		expect(should('/__data.json', 'GET', 'text/html')).toBe(false);
 	});
 	it('rejects api, media, healthz, assets', () => {
 		expect(should('/api/tasks/dishwasher')).toBe(false);
