@@ -13,18 +13,16 @@
 	nav={data.nav}
 	pathname={page.url.pathname}
 >
-	<!-- Legacy page width until each screen is restyled. -->
-	<div class="legacy">
+	<!-- Legacy page width until each screen is restyled (Home is done). -->
+	<div class:legacy={page.url.pathname !== '/'}>
 		{@render children()}
 	</div>
 </AppShell>
 
 <style>
+	/* The design tokens own the page colours and font (base.css); only the margin reset stays here. */
 	:global(body) {
 		margin: 0;
-		font-family: system-ui, sans-serif;
-		background: #f9fafb;
-		color: #111827;
 	}
 	:global(button) {
 		width: 100%;
