@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { error } from '@sveltejs/kit';
 import { and, eq, gt } from 'drizzle-orm';
-import type { Db } from '../db';
+import type { Db, Executor } from '../db';
 import { sessions, users } from '../db/schema';
 import { hashPassword, verifyPassword } from './hash';
 import { AuthError, normalizeUsername, toUser, type User } from './users';
@@ -69,7 +69,7 @@ export async function logout(db: Db, sessionId: string): Promise<void> {
 }
 
 /** Kills every session of a user (deactivation, password reset). */
-export async function revokeUserSessions(db: Db, userId: number): Promise<void> {
+export async function revokeUserSessions(db: Executor, userId: number): Promise<void> {
 	await db.delete(sessions).where(eq(sessions.userId, userId));
 }
 

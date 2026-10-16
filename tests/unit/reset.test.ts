@@ -116,6 +116,19 @@ describe('createResetToken / consumeResetToken', () => {
 		await consumeResetToken(t.db, second, NEW_PW);
 	});
 
+	it('leaves exactly one valid token after concurrent creations for the same user', async () => {
+		const u = await newUser();
+		const tokens = await Promise.all(
+			Array.from({ length: 6 }, () => createResetToken(t.db, adminId, u.id))
+		);
+		const rows = await t.db.select().from(resetTokens).where(eq(resetTokens.userId, u.id));
+		expect(rows).toHaveLength(1);
+		const results = await Promise.allSettled(
+			tokens.map((tok, i) => consumeResetToken(t.db, tok, `Zyxwvu9#Better${i}`))
+		);
+		expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+	});
+
 	it('lets exactly one of two concurrent consumes succeed', async () => {
 		const u = await newUser();
 		const token = await createResetToken(t.db, adminId, u.id);

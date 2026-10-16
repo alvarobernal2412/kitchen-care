@@ -42,7 +42,12 @@ export async function createResetToken(
 		if (!actor || actor.role !== 'admin' || !actor.active) {
 			throw new ResetError('forbidden', 'Only an active admin can create reset links.');
 		}
-		const [target] = await tx.select({ id: users.id }).from(users).where(eq(users.id, userId));
+		// Row lock serialises concurrent creations for one user so only the latest link survives.
+		const [target] = await tx
+			.select({ id: users.id })
+			.from(users)
+			.where(eq(users.id, userId))
+			.for('update');
 		if (!target) throw new ResetError('user_not_found', 'User not found.');
 
 		// Only the latest link may work.
@@ -91,7 +96,7 @@ export async function consumeResetToken(
 			.update(resetTokens)
 			.set({ usedAt: now })
 			.where(eq(resetTokens.tokenHash, hashToken(token)));
-		await revokeUserSessions(tx as unknown as Db, row.userId);
+		await revokeUserSessions(tx, row.userId);
 	});
 }
 
