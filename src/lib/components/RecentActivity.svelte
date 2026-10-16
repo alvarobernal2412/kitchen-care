@@ -12,8 +12,8 @@
 		grounds: 'logged coffee grounds',
 		milk: 'brought milk',
 		beans: 'brought coffee beans',
-		descale: 'descaled the coffee machine',
-		deep_clean: 'deep cleaned the kitchen'
+		descale: 'descaled the machine',
+		deep_clean: 'deep cleaned'
 	};
 	const phrase = (i: Item) => PHRASE[i.taskKey] ?? `logged ${i.taskLabel.toLowerCase()}`;
 </script>
@@ -25,7 +25,7 @@
 		{#each items as item (item.id)}
 			<li>
 				<Avatar name={item.username} size={32} />
-				<span class="what"><b>{item.username}</b> {phrase(item)}</span>
+				<span class="what"><b class="user">{item.username}</b><span class="act">{phrase(item)}</span></span>
 				<time datetime={item.at}>{shortAgo(item.at, now)}</time>
 			</li>
 		{/each}
@@ -49,13 +49,21 @@
 		line-height: 1.35;
 	}
 	.what {
+		display: flex;
+		gap: 0.3em;
 		min-width: 0;
+	}
+	/* only the name gives way; the action and the time stay readable */
+	.user {
+		min-width: 4ch;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
-	}
-	b {
 		font-weight: 600;
+	}
+	.act {
+		flex: none;
+		white-space: nowrap;
 	}
 	time {
 		color: var(--muted);

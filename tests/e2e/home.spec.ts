@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import * as schema from '../../src/lib/server/db/schema';
 import { createUser, db, getUser, giveSession } from './helpers';
 
@@ -22,21 +22,28 @@ type Seed = {
 };
 
 /** Inserts submissions straight into the e2e database for a user. */
-const pendingOwners: number[] = [];
+// Everything a test creates is removed afterwards (the e2e database is shared by every spec), so
+// seeded points never leak into other tests' ranks and pending rows never reach the admin badge.
+const createdUsers: number[] = [];
+const createdPeriods: number[] = [];
+const createdPosts: number[] = [];
 
-// The shared database feeds the admin review badge, so pending rows must not outlive their test.
 test.afterEach(async () => {
-	while (pendingOwners.length) {
-		const id = pendingOwners.pop()!;
-		await db
-			.delete(schema.submissions)
-			.where(and(eq(schema.submissions.userId, id), eq(schema.submissions.status, 'pending')));
+	const ids = createdUsers.splice(0);
+	for (const id of ids) {
+		await db.delete(schema.periodWinners).where(eq(schema.periodWinners.userId, id));
+		await db.delete(schema.posts).where(eq(schema.posts.userId, id));
+		await db.delete(schema.submissions).where(eq(schema.submissions.userId, id));
 	}
+	for (const id of createdPeriods.splice(0)) {
+		await db.delete(schema.periodWinners).where(eq(schema.periodWinners.periodId, id));
+		await db.delete(schema.periods).where(eq(schema.periods.id, id));
+	}
+	createdPosts.length = 0;
 });
 
 async function seed(username: string, rows: Seed[]) {
 	const user = await getUser(username);
-	if (rows.some((r) => r.status === 'pending')) pendingOwners.push(user.id);
 	const periodId = await activePeriodId();
 	for (const r of rows) {
 		const status = r.status ?? 'approved';
@@ -53,6 +60,7 @@ async function seed(username: string, rows: Seed[]) {
 
 async function signedIn(page: Page, username?: string) {
 	const creds = await createUser(username);
+	createdUsers.push((await getUser(creds.username)).id);
 	await giveSession(page.context(), creds.username, creds.password);
 	return creds.username;
 }
@@ -104,6 +112,41 @@ async function noHorizontalOverflow(page: Page) {
 	expect(result.wide).toEqual([]);
 }
 
+const longName = () => 'W'.repeat(24) + Math.random().toString(36).slice(2, 8);
+
+/** Only the name gives way (ellipsis); "logged ..." and the time must remain fully visible. */
+async function expectLongNameTruncated(page: Page) {
+	const username = await signedIn(page, longName());
+	await seed(username, [{ task: 'dishwasher', points: 2 }]);
+	await openHome(page);
+	const li = page.locator('.recent li').first();
+	await expect(li.locator('.act')).toHaveText('logged dishwasher');
+	const m = await li.evaluate((el) => {
+		const q = (sel: string) => el.querySelector(sel) as HTMLElement;
+		const user = q('.user');
+		const li = el.getBoundingClientRect();
+		const within = (e: HTMLElement) => {
+			const r = e.getBoundingClientRect();
+			return r.left >= li.left - 0.5 && r.right <= li.right + 0.5;
+		};
+		return {
+			ellipsis: getComputedStyle(user).textOverflow,
+			clipped: user.scrollWidth > user.clientWidth,
+			actClipped: q('.act').scrollWidth > q('.act').clientWidth,
+			actVisible: within(q('.act')),
+			timeVisible: within(q('time'))
+		};
+	});
+	expect(m).toEqual({
+		ellipsis: 'ellipsis',
+		clipped: true,
+		actClipped: false,
+		actVisible: true,
+		timeVisible: true
+	});
+	await noHorizontalOverflow(page);
+}
+
 test.describe('home on a phone', () => {
 	test.use({ viewport: PHONE });
 
@@ -139,9 +182,9 @@ test.describe('home on a phone', () => {
 		await expect(tile(page, 'milk')).toContainText('Photo + review');
 		await expect(tile(page, 'beans')).toContainText('Waiting for review');
 		await expect(tile(page, 'dishwasher')).toContainText(/Ready in \d+ (min|h)/);
-		const dish = page.getByRole('button', { name: /Empty or run dishwasher, ready in/ });
+		const dish = page.getByRole('button', { name: /Empty or run dishwasher, plus 2 credits, ready in/ });
 		await expect(dish).toHaveAttribute('aria-disabled', 'true');
-		await expect(page.getByRole('button', { name: /Log Take coffee grounds.*plus 3 credits/ })).toBeEnabled();
+		await expect(page.getByRole('button', { name: /Take coffee grounds.*, plus 3 credits, tap to log/ })).toBeEnabled();
 	});
 
 	test('cooldown fill reflects the elapsed share of the cooldown', async ({ page }) => {
@@ -199,7 +242,9 @@ test.describe('home on a phone', () => {
 		await expect(page.getByTestId('status')).not.toContainText('Log your first chore');
 		await expect(page.getByTestId('rank')).toHaveText(/^\d+(st|nd|rd|th) of \d+$/);
 		// the activity feed refreshes too
-		await expect(page.locator('.recent li').first()).toContainText(`${username} logged coffee grounds`);
+		const latest = page.locator('.recent li').first();
+		await expect(latest.locator('.user')).toHaveText(username);
+		await expect(latest.locator('.act')).toHaveText('logged coffee grounds');
 		expect(await tileBoxes(page)).toEqual(before);
 
 		const [row] = await db
@@ -207,6 +252,31 @@ test.describe('home on a phone', () => {
 			.from(schema.submissions)
 			.where(eq(schema.submissions.userId, (await getUser(username)).id));
 		expect(row).toMatchObject({ taskKey: 'grounds', status: 'approved', pointsAwarded: 3 });
+	});
+
+	test('two quick logs in a row: the total ends on the second server value', async ({ page }) => {
+		const username = await signedIn(page);
+		await openHome(page);
+		const responses: number[] = [];
+		page.on('response', async (r) => {
+			if (/\/api\/tasks\//.test(r.url()) && r.ok()) responses.push((await r.json()).newTotal);
+		});
+		await tile(page, 'dishwasher').click();
+		// the second tap lands while the first celebration is still playing (fly + count-up)
+		await tile(page, 'grounds').click();
+		await expect.poll(() => responses).toEqual([2, 5]);
+		await expect(total(page)).toHaveText('5');
+		await expect(tile(page, 'dishwasher')).toHaveAttribute('data-state', 'cooldown');
+		await expect(tile(page, 'grounds')).toHaveAttribute('data-state', 'cooldown');
+		await expect(page.getByTestId('fly')).toHaveCount(0);
+		// the refreshed server data agrees (still 5 after a reload)
+		await page.reload();
+		await expect(total(page)).toHaveText('5');
+		const rows = await db
+			.select()
+			.from(schema.submissions)
+			.where(eq(schema.submissions.userId, (await getUser(username)).id));
+		expect(rows).toHaveLength(2);
 	});
 
 	test('the +N flies to the total when motion is allowed', async ({ page }) => {
@@ -259,18 +329,8 @@ test.describe('home on a phone', () => {
 		await noHorizontalOverflow(page);
 	});
 
-	test('a very long username truncates in recent activity', async ({ page }) => {
-		const username = await signedIn(page, 'W'.repeat(32));
-		await seed(username, [{ task: 'milk', points: 3 }]);
-		await openHome(page);
-		const what = page.locator('.recent li .what').first();
-		await expect(what).toContainText('brought milk');
-		const m = await what.evaluate((el) => ({
-			overflow: getComputedStyle(el).textOverflow,
-			clipped: el.scrollWidth > el.clientWidth
-		}));
-		expect(m).toEqual({ overflow: 'ellipsis', clipped: true });
-		await noHorizontalOverflow(page);
+	test('a very long username truncates but the action and time stay visible', async ({ page }) => {
+		await expectLongNameTruncated(page);
 	});
 
 	test('a period without activity shows the friendly empty state', async ({ page }) => {
@@ -281,6 +341,7 @@ test.describe('home on a phone', () => {
 			.insert(schema.periods)
 			.values({ name: 'Fresh period', startsAt: new Date(), status: 'active' })
 			.returning();
+		createdPeriods.push(fresh.id);
 		try {
 			await openHome(page);
 			await expect(page.getByText('Fresh period')).toBeVisible();
@@ -361,6 +422,13 @@ test.describe('home on a laptop', () => {
 		const hRec = (await page.getByRole('heading', { name: 'Recent in the kitchen' }).boundingBox())!;
 		expect(Math.abs(hLog.y - hRec.y)).toBeLessThan(4);
 		await noHorizontalOverflow(page);
+	});
+});
+
+test.describe('home recent activity in the 280 px desktop column', () => {
+	test.use({ viewport: LAPTOP });
+	test('a very long username truncates but the action and time stay visible', async ({ page }) => {
+		await expectLongNameTruncated(page);
 	});
 });
 

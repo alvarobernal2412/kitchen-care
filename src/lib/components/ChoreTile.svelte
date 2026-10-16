@@ -51,6 +51,7 @@
 		busy = false,
 		disabled = false,
 		note = null,
+		pendingCount = 0,
 		onLog
 	}: {
 		task: ChoreTask;
@@ -67,6 +68,8 @@
 		disabled?: boolean;
 		/** Calm inline confirmation that replaces the state line, e.g. "Sent for review". */
 		note?: string | null;
+		/** The user's own submissions of this chore waiting for review. */
+		pendingCount?: number;
 		onLog: (task: ChoreTask) => void;
 	} = $props();
 
@@ -91,11 +94,12 @@
 
 	const name = $derived.by(() => {
 		const plus = `plus ${task.points} credit${task.points === 1 ? '' : 's'}`;
-		if (tileState === 'cooldown') return `${task.label}, ${readyInSpoken(remainingSec)}`;
-		if (tileState === 'pending') return `${task.label}, waiting for review`;
-		if (tileState === 'photo') return `Log ${task.label}, ${plus}, needs a photo`;
-		if (task.needsPhoto) return `Log ${task.label}, ${plus}, photo check`;
-		return `Log ${task.label}, ${plus}`;
+		if (tileState === 'cooldown') return `${task.label}, ${plus}, ${readyInSpoken(remainingSec)}`;
+		if (tileState === 'pending')
+			return `${task.label}, ${plus}, ${pendingCount} waiting for review${disabled ? '' : ', tap to submit another'}`;
+		if (tileState === 'photo') return `${task.label}, ${plus}, photo and review, tap to take a photo`;
+		if (task.needsPhoto) return `${task.label}, ${plus}, photo check, tap to log`;
+		return `${task.label}, ${plus}, tap to log`;
 	});
 
 	function press() {
@@ -246,7 +250,6 @@
 		inset: auto 0 0 0;
 		height: var(--fill, 0%);
 		background: var(--glaze);
-		border-top: 1px solid color-mix(in srgb, var(--muted) 35%, transparent);
 	}
 	.cool .pts {
 		color: var(--muted);

@@ -44,7 +44,7 @@
 			else if (t.needsReview && t.pendingCount > 0) state = 'pending';
 			else if (t.needsReview) state = 'photo';
 			else state = 'ready';
-			return { task, state, at, cooldownSeconds: t.cooldownSeconds, full: t.pendingCount >= MAX_PENDING };
+			return { task, state, at, cooldownSeconds: t.cooldownSeconds, full: t.pendingCount >= MAX_PENDING, pending: t.pendingCount };
 		})
 	);
 
@@ -79,7 +79,7 @@
 	let totalEl: HTMLElement | undefined = $state();
 
 	// ---- the one motion moment: stamp, +N flies to the total, total counts up ----
-	type Fly = { n: number; left: number; top: number; dx: number; dy: number };
+	type Fly = { id: number; n: number; left: number; top: number; dx: number; dy: number };
 	let fly = $state<Fly | null>(null);
 	let rafId = 0;
 
@@ -88,10 +88,15 @@
 		r.width > 0 && r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth;
 	const wait = (ms: number) => new Promise<void>((res) => setTimeout(res, ms));
 
-	function tween(from: number, to: number, ms: number): Promise<void> {
+	// Each celebration gets a number; only the latest one may touch shared state, so a second log
+	// that starts mid-animation is never cut off by the first one finishing.
+	let celebrationId = 0;
+
+	function tween(from: number, to: number, ms: number, current: () => boolean): Promise<void> {
 		return new Promise((resolve) => {
 			const start = performance.now();
 			const step = (t: number) => {
+				if (!current()) return resolve(); // superseded: the newer celebration owns the number
 				const p = Math.min(1, (t - start) / ms);
 				const eased = 1 - Math.pow(1 - p, 3);
 				shown = p >= 1 ? to : Math.round(from + (to - from) * eased);
@@ -103,9 +108,11 @@
 	}
 
 	async function celebrate(key: string, points: number, newTotal: number | undefined) {
+		const id = ++celebrationId;
+		const current = () => id === celebrationId;
 		const target = newTotal ?? shown + points;
 		const tile = tileRefs[key];
-		const from = tile?.stamp() ?? null; // the stamp plays even under reduced motion's short durations
+		const from = tile?.stamp() ?? null; // under reduced motion the global CSS shortens the stamp to ~0
 		announce = `${points} credit${points === 1 ? '' : 's'} logged. Total ${target}.`;
 		const task = data.tiles.find((t) => t.key === key);
 		overrides[key] = Date.now() + (task?.cooldownSeconds ?? 0) * 1000;
@@ -118,20 +125,22 @@
 				const to = totalEl?.getBoundingClientRect();
 				let flies = false;
 				if (from && to && onScreen(from) && onScreen(to)) {
-					fly = { n: points, left: from.left, top: from.top, dx: to.left - from.left, dy: to.top - from.top };
+					fly = { id, n: points, left: from.left, top: from.top, dx: to.left - from.left, dy: to.top - from.top };
 					flies = true;
 				}
 				if (flies) await wait(480);
-				await tween(shown, target, 600);
-				fly = null;
+				if (current()) await tween(shown, target, 600, current);
 			}
 		} finally {
-			fly = null;
-			shown = target;
-			animating = false;
+			if (current()) {
+				fly = null;
+				shown = target;
+				animating = false;
+			}
 		}
+		if (!current()) return;
 		await invalidateAll(); // rank, summary and recent activity
-		overrides = {};
+		if (current()) overrides = {};
 	}
 
 	function note(key: string, text: string) {
@@ -348,6 +357,7 @@
 						busy={busyKey === t.task.key}
 						disabled={(busyKey !== null && busyKey !== t.task.key) || (t.state === 'pending' && t.full)}
 						note={notes[t.task.key] ?? null}
+						pendingCount={t.pending}
 						onLog={onTile}
 					/>
 				{/each}
@@ -365,6 +375,7 @@
 {/if}
 
 {#if fly}
+	{#key fly.id}
 	<span
 		class="fly"
 		style:left="{fly.left}px"
@@ -374,6 +385,7 @@
 		aria-hidden="true"
 		data-testid="fly">+{fly.n}</span
 	>
+	{/key}
 {/if}
 
 {#if capture}
