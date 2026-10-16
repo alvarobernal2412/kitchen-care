@@ -5,27 +5,31 @@ import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
 
 const OUT = join(dirname(fileURLToPath(import.meta.url)), '..', 'static', 'icons');
-const BRAND = '#1d4ed8';
-const SPARK = '#fbbf24';
+const PLASTER = '#EDF0EB';
+const TEAL = '#127A68';
 
-// A coffee cup with a sparkle ("karma") above it, drawn on a 512x512 canvas. The motif lives
-// in a group that the maskable variant scales down so it stays inside the 80% safe zone.
+// An enamel-teal tile on plaster holding a coffee cup with a check ("done, credit earned"), drawn
+// on a 512x512 canvas. The tile + cup live in one group that is scaled per variant: the maskable
+// variant keeps everything inside the central 80% safe circle (tile corners at ~191px of 205px).
 const motif = `
-	<path d="M140 232h200v70a100 100 0 0 1-100 100h0a100 100 0 0 1-100-100z" fill="#fff"/>
-	<path d="M340 256h14a38 38 0 0 1 0 76h-24" fill="none" stroke="#fff" stroke-width="22" stroke-linecap="round"/>
-	<rect x="120" y="416" width="240" height="22" rx="11" fill="#fff"/>
-	<path d="M240 84l18 52 52 18-52 18-18 52-18-52-52-18 52-18z" fill="${SPARK}"/>
-	<path d="M330 140l7 20 20 7-20 7-7 20-7-20-20-7 20-7z" fill="${SPARK}"/>`;
+	<rect x="106" y="106" width="300" height="300" rx="64" fill="${TEAL}"/>
+	<g transform="translate(0 -34)">
+		<path d="M196 226h112v50a56 56 0 0 1-56 56h0a56 56 0 0 1-56-56z" fill="${PLASTER}"/>
+		<path d="M308 244h10a24 24 0 0 1 0 48h-14" fill="none" stroke="${PLASTER}" stroke-width="14" stroke-linecap="round"/>
+		<rect x="176" y="342" width="152" height="12" rx="6" fill="${PLASTER}"/>
+		<path d="M230 272l16 16 30-32" fill="none" stroke="${TEAL}" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+	</g>`;
 
 function svg({ maskable }) {
-	// Any-purpose: rounded tile. Maskable: full bleed (the OS applies its own mask), motif at 70%.
+	// Any-purpose: rounded plaster tile. Maskable: full-bleed plaster (the OS applies its own mask).
 	const bg = maskable
-		? `<rect width="512" height="512" fill="${BRAND}"/>`
-		: `<rect width="512" height="512" rx="112" fill="${BRAND}"/>`;
+		? `<rect width="512" height="512" fill="${PLASTER}"/>`
+		: `<rect width="512" height="512" rx="112" fill="${PLASTER}"/>`;
 	const group = maskable
-		? `<g transform="translate(256 256) scale(0.7) translate(-240 -266)">${motif}</g>`
-		: `<g transform="translate(256 256) scale(0.9) translate(-240 -266)">${motif}</g>`;
-	return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">${bg}${group}</svg>\n`;
+		? `<g transform="translate(256 256) scale(0.9) translate(-256 -256)">${motif}</g>`
+		: `<g transform="translate(256 256) scale(1.2) translate(-256 -256)">${motif}</g>`;
+	return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">${bg}${group}</svg>
+`;
 }
 
 const any = svg({ maskable: false });
@@ -42,5 +46,5 @@ await png(any, 192, 'icon-192.png');
 await png(any, 512, 'icon-512.png');
 await png(maskable, 512, 'icon-maskable-512.png');
 // iOS ignores transparency and masks corners itself, so use the full-bleed version.
-await png(maskable.replace('scale(0.7)', 'scale(0.85)'), 180, 'apple-touch-icon.png');
+await png(maskable.replace('scale(0.9)', 'scale(1)'), 180, 'apple-touch-icon.png');
 console.log('Icons written to', OUT);
