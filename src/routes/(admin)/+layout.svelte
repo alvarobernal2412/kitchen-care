@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import AppShell from '$lib/components/AppShell.svelte';
+	import '$lib/styles/legacy.css'; // interim shim, see the file
 
 	let { data, children } = $props();
 </script>
