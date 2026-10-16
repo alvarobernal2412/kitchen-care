@@ -16,7 +16,9 @@ const config = {
 				'style-src': ['self', 'unsafe-inline'],
 				'img-src': ['self', 'data:', 'blob:'],
 				'media-src': ['self', 'blob:'],
-				'connect-src': ['self'],
+				// coco-ssd (cutlery check) fetches model.json and weight shards from this origin at
+				// runtime (BASE_PATH in @tensorflow-models/coco-ssd). tfjs needs nothing else here.
+				'connect-src': ['self', 'https://storage.googleapis.com'],
 				'font-src': ['self'],
 				'object-src': ['none'],
 				'base-uri': ['self'],
