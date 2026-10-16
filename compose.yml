@@ -1,0 +1,114 @@
+# Production stack, designed to sit behind an existing Nginx Proxy Manager (NPM) on a shared VM.
+# Nothing here publishes a host port. NPM forwards to `kitchen-care-proxy:80` over the external
+# Docker network named by NPM_NETWORK. Run via deploy/deploy.sh; see deploy/README.md.
+name: kitchen-care
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: '10m'
+    max-file: '3'
+
+x-app: &app
+  networks: [internal]
+  restart: unless-stopped
+  mem_limit: 384m
+  logging: *logging
+  # Colours only start when named explicitly (deploy.sh), never by a bare `docker compose up`.
+  profiles: [apps]
+  depends_on:
+    postgres:
+      condition: service_healthy
+  volumes:
+    - uploads:/data/uploads
+  environment: &app-env
+    ORIGIN: ${ORIGIN:?set ORIGIN in .env}
+    # Real client address: the proxy overwrites X-Forwarded-For with a single trusted entry.
+    ADDRESS_HEADER: X-Forwarded-For
+    XFF_DEPTH: '1'
+    BODY_SIZE_LIMIT: 6M
+    APP_TIMEZONE: ${APP_TIMEZONE:?set APP_TIMEZONE in .env}
+    SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET in .env}
+    DATABASE_URL: postgres://kitchen:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/kitchen
+    NODE_OPTIONS: --max-old-space-size=288
+
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    mem_limit: 192m
+    logging: *logging
+    networks: [internal]
+    # Small footprint for a shared VPS: two app colours x 10 pooled connections stay under 30.
+    command:
+      - postgres
+      - -c
+      - shared_buffers=48MB
+      - -c
+      - max_connections=30
+      - -c
+      - work_mem=4MB
+      - -c
+      - maintenance_work_mem=32MB
+    environment:
+      POSTGRES_USER: kitchen
+      POSTGRES_DB: kitchen
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U kitchen -d kitchen']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # Blue and green run the same app from two image tags that deploy.sh maintains.
+  app-blue:
+    <<: *app
+    image: kitchen-care-app:blue
+
+  app-green:
+    <<: *app
+    image: kitchen-care-app:green
+
+  # One-shot tooling (migrations, first admin). Not started by `up`.
+  migrate:
+    image: kitchen-care-app:next
+    profiles: [tools]
+    networks: [internal]
+    logging: *logging
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://kitchen:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/kitchen
+    command: ['node', 'scripts/migrate.js']
+
+  # Stable upstream for NPM. The service name doubles as its DNS name on the shared NPM network,
+  # hence the prefix: it must not collide with other apps' services there.
+  kitchen-care-proxy:
+    image: nginx:1.28-alpine
+    restart: unless-stopped
+    mem_limit: 32m
+    logging: *logging
+    networks: [internal, npm]
+    command: ['nginx', '-c', '/etc/nginx/kc-static/nginx.conf', '-g', 'daemon off;']
+    volumes:
+      # Directories, not single files, so replaced files (rsync, atomic mv) are picked up.
+      - ./deploy/nginx:/etc/nginx/kc-static:ro
+      - ./state:/etc/nginx/kc:ro
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1/nginx-health']
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+networks:
+  internal: {}
+  npm:
+    external: true
+    name: ${NPM_NETWORK:?set NPM_NETWORK in .env (the Docker network Nginx Proxy Manager is on)}
+
+volumes:
+  pgdata: {}
+  uploads: {}

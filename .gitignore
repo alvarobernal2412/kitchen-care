@@ -10,3 +10,4 @@ playwright-report/
 .superpowers/
 .claude/
 build-scripts/
+state/
