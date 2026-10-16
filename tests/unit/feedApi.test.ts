@@ -1,0 +1,211 @@
+import { readFile } from 'node:fs/promises';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { getTestDb, type TestDb } from '../helpers/testDb';
+import { comments, posts, reactions, users } from '../../src/lib/server/db/schema';
+import { createPost } from '../../src/lib/server/feed';
+import { resetRateLimits } from '../../src/lib/server/ratelimit';
+
+let t: TestDb;
+vi.mock('$lib/server/db', () => ({ getDb: () => t.db }));
+
+type U = { id: number; displayUsername: string; active: boolean } | null;
+let alice: NonNullable<U>;
+let bob: NonNullable<U>;
+
+beforeAll(async () => {
+	t = await getTestDb();
+	const mk = async (name: string) => {
+		const [u] = await t.db
+			.insert(users)
+			.values({ usernameNormalized: name, displayUsername: name, passwordHash: 'x' })
+			.returning();
+		return { ...u, active: true };
+	};
+	alice = await mk('alice');
+	bob = await mk('bob');
+});
+afterAll(async () => {
+	await t.close();
+});
+beforeEach(async () => {
+	resetRateLimits();
+	await t.db.delete(reactions);
+	await t.db.delete(comments);
+	await t.db.delete(posts);
+});
+
+type Handler = (e: unknown) => Promise<Response>;
+async function call(
+	mod: Record<string, unknown>,
+	method: string,
+	user: U,
+	id: string,
+	body?: unknown
+) {
+	const request = new Request('http://localhost/x', {
+		method,
+		headers: { 'content-type': 'application/json' },
+		body: body === undefined ? undefined : JSON.stringify(body)
+	});
+	const res = await (mod[method] as Handler)({ locals: { user }, params: { id }, request });
+	return { status: res.status, body: await res.json() };
+}
+
+const reactionsRoute = () => import('../../src/routes/api/posts/[id]/reactions/+server');
+const commentsRoute = () => import('../../src/routes/api/posts/[id]/comments/+server');
+const postRoute = () => import('../../src/routes/api/posts/[id]/+server');
+const commentRoute = () => import('../../src/routes/api/comments/[id]/+server');
+
+describe('POST /api/posts/[id]/reactions', () => {
+	it('401 anonymous, 403 inactive', async () => {
+		const m = await reactionsRoute();
+		expect((await call(m, 'POST', null, '1', { emoji: '👏' })).status).toBe(401);
+		expect((await call(m, 'POST', { ...bob, active: false }, '1', { emoji: '👏' })).status).toBe(
+			403
+		);
+	});
+
+	it('validates id, emoji and existence', async () => {
+		const m = await reactionsRoute();
+		const p = await createPost(t.db, alice.id, { body: 'hi' });
+		expect((await call(m, 'POST', bob, 'abc', { emoji: '👏' })).status).toBe(404);
+		expect((await call(m, 'POST', bob, '999999', { emoji: '👏' })).status).toBe(404);
+		expect((await call(m, 'POST', bob, String(p.id), { emoji: '👍' })).status).toBe(400);
+		expect((await call(m, 'POST', bob, String(p.id), {})).status).toBe(400);
+	});
+
+	it('toggles and returns counts + own reactions', async () => {
+		const m = await reactionsRoute();
+		const p = await createPost(t.db, alice.id, { body: 'hi' });
+		const on = await call(m, 'POST', bob, String(p.id), { emoji: '☕' });
+		expect(on.status).toBe(200);
+		expect(on.body.counts['☕']).toBe(1);
+		expect(on.body.mine).toEqual(['☕']);
+		const off = await call(m, 'POST', bob, String(p.id), { emoji: '☕' });
+		expect(off.body.counts['☕']).toBe(0);
+	});
+
+	it('rate limits at 60/min', async () => {
+		const m = await reactionsRoute();
+		const p = await createPost(t.db, alice.id, { body: 'hi' });
+		for (let i = 0; i < 60; i++) await call(m, 'POST', bob, String(p.id), { emoji: '👏' });
+		expect((await call(m, 'POST', bob, String(p.id), { emoji: '👏' })).status).toBe(429);
+	});
+});
+
+describe('comments API', () => {
+	it('requires login for GET and POST', async () => {
+		const m = await commentsRoute();
+		expect((await call(m, 'GET', null, '1')).status).toBe(401);
+		expect((await call(m, 'POST', null, '1', { body: 'x' })).status).toBe(401);
+	});
+
+	it('adds, lists and validates', async () => {
+		const m = await commentsRoute();
+		const p = await createPost(t.db, alice.id, { body: 'hi' });
+		const id = String(p.id);
+		const created = await call(m, 'POST', bob, id, { body: '<b>hey</b>' });
+		expect(created.status).toBe(201);
+		expect(created.body.comment).toMatchObject({ body: '<b>hey</b>', author: { id: bob.id } });
+		expect((await call(m, 'POST', bob, id, { body: '' })).status).toBe(422);
+		expect((await call(m, 'POST', bob, id, { body: 'a'.repeat(301) })).status).toBe(422);
+		expect((await call(m, 'POST', bob, id, { nope: 1 })).status).toBe(400);
+		expect((await call(m, 'POST', bob, '999999', { body: 'x' })).status).toBe(404);
+		const list = await call(m, 'GET', alice, id);
+		expect(list.body.comments).toHaveLength(1);
+		expect((await call(m, 'GET', alice, '999999')).status).toBe(404);
+	});
+
+	it('rate limits comments at 10/min', async () => {
+		const m = await commentsRoute();
+		const p = await createPost(t.db, alice.id, { body: 'hi' });
+		for (let i = 0; i < 10; i++) await call(m, 'POST', bob, String(p.id), { body: 'x' });
+		expect((await call(m, 'POST', bob, String(p.id), { body: 'x' })).status).toBe(429);
+	});
+});
+
+describe('DELETE endpoints', () => {
+	it('post: 401, 403 for non-author, 404 missing, 200 for author', async () => {
+		const m = await postRoute();
+		const p = await createPost(t.db, alice.id, { body: 'hi' });
+		const id = String(p.id);
+		expect((await call(m, 'DELETE', null, id)).status).toBe(401);
+		expect((await call(m, 'DELETE', bob, id)).status).toBe(403);
+		expect((await call(m, 'DELETE', alice, '999999')).status).toBe(404);
+		expect((await call(m, 'DELETE', alice, id)).status).toBe(200);
+		expect(await t.db.select().from(posts)).toHaveLength(0);
+	});
+
+	it('comment: 403 for non-author, 200 for author', async () => {
+		const cm = await commentsRoute();
+		const m = await commentRoute();
+		const p = await createPost(t.db, alice.id, { body: 'hi' });
+		const c = await call(cm, 'POST', bob, String(p.id), { body: 'mine' });
+		const id = String(c.body.comment.id);
+		expect((await call(m, 'DELETE', alice, id)).status).toBe(403);
+		expect((await call(m, 'DELETE', bob, id)).status).toBe(200);
+		expect((await call(m, 'DELETE', bob, id)).status).toBe(404);
+	});
+});
+
+describe('feed UI safety', () => {
+	it('never renders user content with {@html}', async () => {
+		for (const f of [
+			'src/lib/components/Post.svelte',
+			'src/lib/components/Reactions.svelte',
+			'src/lib/components/Comments.svelte',
+			'src/routes/(app)/feed/+page.svelte'
+		]) {
+			expect(await readFile(f, 'utf8')).not.toContain('@html');
+		}
+	});
+});
+
+describe('feed page', () => {
+	async function mod() {
+		return import('../../src/routes/(app)/feed/+page.server');
+	}
+
+	it('post action creates a post, validates, and rate limits at 5/min', async () => {
+		const { actions } = await mod();
+		const run = async (body: string, user: U = alice) => {
+			const fd = new FormData();
+			fd.set('body', body);
+			const request = new Request('http://localhost/feed?/post', { method: 'POST', body: fd });
+			return (actions.post as (e: unknown) => Promise<{ status?: number; data?: unknown }>)({
+				request,
+				locals: { user }
+			});
+		};
+		expect(await run('hello')).toEqual({ posted: true });
+		expect((await run('')).status).toBe(400);
+		expect((await run('x'.repeat(501))).status).toBe(400);
+		expect((await run('hi', null)).status).toBe(401);
+		expect((await run('hi', { ...alice, active: false })).status).toBe(403);
+		resetRateLimits();
+		for (let i = 0; i < 5; i++) await run(`p${i}`);
+		expect((await run('too many')).status).toBe(429);
+	});
+
+	it('load returns the first page with a cursor and serialisable dates', async () => {
+		const { load } = await mod();
+		for (let i = 0; i < 22; i++) await createPost(t.db, alice.id, { body: `p${i}` });
+		const run = (url: string) =>
+			(load as (e: unknown) => Promise<{ posts: { body: string }[]; next: null | { before: string; beforeId: number }; paged: boolean }>)({
+				locals: { user: alice },
+				url: new URL(url)
+			});
+		const first = await run('http://localhost/feed');
+		expect(first.posts).toHaveLength(20);
+		expect(first.paged).toBe(false);
+		expect(first.next).not.toBeNull();
+		const second = await run(
+			`http://localhost/feed?before=${encodeURIComponent(first.next!.before)}&beforeId=${first.next!.beforeId}`
+		);
+		expect(second.paged).toBe(true);
+		expect(second.posts.map((p) => p.body)).toEqual(['p1', 'p0']);
+		expect(second.next).toBeNull();
+		// garbage cursor falls back to the first page
+		expect((await run('http://localhost/feed?before=nope')).posts).toHaveLength(20);
+	});
+});

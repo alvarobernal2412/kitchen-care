@@ -7,6 +7,7 @@
 <header>
 	<a class="brand" href={resolve('/')}>Kitchen Care Credits</a>
 	<nav>
+		<a href={resolve('/feed')}>Feed</a>
 		<a href={resolve('/leaderboard')}>Leaderboard</a>
 		<a href={resolve('/history')}>History</a>
 		{#if data.user.role === 'admin'}<a href={resolve('/admin/periods')}>Admin</a>{/if}
