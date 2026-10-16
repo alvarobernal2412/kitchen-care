@@ -30,7 +30,7 @@
 		{#if data.active.pending > 0}
 			<p class="warn" role="status">
 				{data.active.pending}
-				{data.active.pending === 1 ? 'submission' : 'submissions'} still pending review — they can
+				{data.active.pending === 1 ? 'submission' : 'submissions'} still pending review &mdash; they can
 				only be rejected after the period ends.
 			</p>
 		{/if}
