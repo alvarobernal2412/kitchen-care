@@ -3,13 +3,14 @@
 	import { invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { onDestroy } from 'svelte';
+	import Avatar from '$lib/components/Avatar.svelte';
 	import PasswordMeter from '$lib/components/PasswordMeter.svelte';
+	import { IconCaretRight } from '$lib/icons';
 	import { avatarUrl } from '$lib/avatar';
 	import { prepareAvatar } from '$lib/client/avatar';
 
 	let { data, form } = $props();
 
-	const initials = $derived(data.profile.username.slice(0, 2).toUpperCase());
 	const current = $derived(avatarUrl(data.profile.avatarPath));
 
 	let newPassword = $state('');
@@ -19,6 +20,18 @@
 	let previewUrl = $state<string | null>(null);
 	let avatarBusy = $state(false);
 	let avatarMessage = $state<{ kind: 'ok' | 'error'; text: string } | null>(null);
+
+	// The server answers with one message; attach it to the field it is about.
+	type Field = 'current' | 'new' | 'confirm';
+	const errorField = $derived.by((): Field | null => {
+		const e = form?.error;
+		if (!e) return null;
+		if (/current password/i.test(e)) return 'current';
+		if (/do not match/i.test(e)) return 'confirm';
+		if (/policy/i.test(e)) return 'new';
+		return null;
+	});
+	const invalid = (f: Field) => (errorField === f ? 'true' : undefined);
 
 	function clearPreview() {
 		if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -83,170 +96,253 @@
 
 <svelte:head><title>Profile</title></svelte:head>
 
-<h2>Profile</h2>
+<div class="page">
+	<h1>Profile</h1>
 
-<section class="who">
-	{#if current}
-		<img class="avatar" src={current} alt="Your avatar" data-testid="avatar" />
-	{:else}
-		<span class="avatar fallback" aria-hidden="true">{initials}</span>
-	{/if}
-	<dl>
-		<dt>Username</dt>
-		<dd>{data.profile.username}</dd>
-		<dt>Classification</dt>
-		<dd>{data.profile.classification ?? '-'}</dd>
-		{#if data.profile.department}
-			<dt>Department</dt>
-			<dd>{data.profile.department}</dd>
-		{/if}
-	</dl>
-</section>
-
-<section>
-	<h3>Profile photo</h3>
-	<label class="file">
-		Choose a photo
-		<input type="file" accept="image/*" onchange={onPick} disabled={avatarBusy} />
-	</label>
-	{#if previewUrl}
-		<img class="avatar preview" src={previewUrl} alt="Preview of your new avatar" data-testid="avatar-preview" />
-		<div class="row">
-			<button type="button" onclick={save} disabled={avatarBusy}>Save photo</button>
-			<button type="button" class="secondary" onclick={clearPreview} disabled={avatarBusy}>Cancel</button>
+	<section class="who" aria-label="Your details">
+		<div class="face" data-testid={current ? 'avatar' : undefined}>
+			<Avatar name={data.profile.username} src={current} size={96} />
 		</div>
-	{/if}
-	{#if current && !previewUrl}
-		<button type="button" class="secondary" onclick={remove} disabled={avatarBusy}>Remove photo</button>
-	{/if}
-	{#if avatarMessage}
-		<p class={avatarMessage.kind === 'ok' ? 'ok' : 'error'} role="status">{avatarMessage.text}</p>
-	{/if}
-</section>
-
-<section>
-	<h3>Change password</h3>
-	<form
-		method="POST"
-		action="?/password"
-		use:enhance={() => {
-			pwBusy = true;
-			return async ({ update }) => {
-				await update({ reset: true });
-				newPassword = '';
-				pwBusy = false;
-			};
-		}}
-	>
-		<label>
-			Current password
-			<input type="password" name="currentPassword" autocomplete="current-password" required />
-		</label>
-		<label>
-			New password
-			<input
-				type="password"
-				name="newPassword"
-				autocomplete="new-password"
-				required
-				bind:value={newPassword}
-			/>
-		</label>
-		<PasswordMeter password={newPassword} />
-		<label>
-			Confirm new password
-			<input type="password" name="confirmPassword" autocomplete="new-password" required />
-		</label>
-		{#if form?.error}<p class="error" role="alert">{form.error}</p>{/if}
-		{#if form?.passwordChanged}
-			<p class="ok" role="status">Password changed. Your other devices were signed out.</p>
-		{/if}
-		<button type="submit" disabled={pwBusy}>Change password</button>
-	</form>
-</section>
-
-{#if data.user.role === 'admin'}
-	<section>
-		<h3>Admin</h3>
-		<a href={resolve('/admin/review')}>Open admin</a>
+		<div class="id">
+			<p class="name">{data.profile.username}</p>
+			{#if data.profile.classification}<p class="meta">{data.profile.classification}</p>{/if}
+			{#if data.profile.department}<p class="meta">{data.profile.department}</p>{/if}
+		</div>
 	</section>
-{/if}
 
-<section>
-	<form method="POST" action="/logout">
-		<button type="submit" class="secondary">Sign out</button>
-	</form>
-</section>
+	<section aria-labelledby="photo-h">
+		<h2 id="photo-h">Photo</h2>
+		<div class="stack">
+			<label class="btn btn-quiet file" class:busy={avatarBusy}>
+				Choose a photo
+				<input
+					class="visually-hidden"
+					type="file"
+					accept="image/*"
+					onchange={onPick}
+					disabled={avatarBusy}
+				/>
+			</label>
+			{#if previewUrl}
+				<img
+					class="preview"
+					src={previewUrl}
+					alt="Preview of your new avatar"
+					data-testid="avatar-preview"
+				/>
+				<div class="cluster">
+					<button type="button" class="btn btn-primary" onclick={save} disabled={avatarBusy}>
+						Save photo
+					</button>
+					<button type="button" class="btn btn-quiet" onclick={clearPreview} disabled={avatarBusy}>
+						Cancel
+					</button>
+				</div>
+			{/if}
+			{#if current && !previewUrl}
+				<button type="button" class="btn btn-quiet" onclick={remove} disabled={avatarBusy}>
+					Remove photo
+				</button>
+			{/if}
+			<p
+				class="note"
+				class:ok={avatarMessage?.kind === 'ok'}
+				class:bad={avatarMessage?.kind === 'error'}
+				role="status"
+				aria-live="polite"
+			>
+				{avatarMessage?.text ?? ''}
+			</p>
+		</div>
+	</section>
+
+	<section aria-labelledby="password-h">
+		<h2 id="password-h">Password</h2>
+		<form
+			method="POST"
+			action="?/password"
+			use:enhance={() => {
+				pwBusy = true;
+				return async ({ update }) => {
+					await update({ reset: true });
+					newPassword = '';
+					pwBusy = false;
+				};
+			}}
+		>
+			<div class="field">
+				<label class="label" for="currentPassword">Current password</label>
+				<input
+					id="currentPassword"
+					class="input"
+					type="password"
+					name="currentPassword"
+					autocomplete="current-password"
+					required
+					aria-invalid={invalid('current')}
+					aria-describedby={errorField === 'current' ? 'pw-error' : undefined}
+				/>
+				{#if errorField === 'current'}<p id="pw-error" class="error" role="alert">{form?.error}</p>{/if}
+			</div>
+			<div class="field">
+				<label class="label" for="newPassword">New password</label>
+				<input
+					id="newPassword"
+					class="input"
+					type="password"
+					name="newPassword"
+					autocomplete="new-password"
+					required
+					bind:value={newPassword}
+					aria-invalid={invalid('new')}
+					aria-describedby={[errorField === 'new' ? 'pw-error' : '', 'pw-meter']
+						.filter(Boolean)
+						.join(' ')}
+				/>
+				{#if errorField === 'new'}<p id="pw-error" class="error" role="alert">{form?.error}</p>{/if}
+				<PasswordMeter password={newPassword} id="pw-meter" />
+			</div>
+			<div class="field">
+				<label class="label" for="confirmPassword">Confirm new password</label>
+				<input
+					id="confirmPassword"
+					class="input"
+					type="password"
+					name="confirmPassword"
+					autocomplete="new-password"
+					required
+					aria-invalid={invalid('confirm')}
+					aria-describedby={errorField === 'confirm' ? 'pw-error' : undefined}
+				/>
+				{#if errorField === 'confirm'}<p id="pw-error" class="error" role="alert">{form?.error}</p>{/if}
+			</div>
+			{#if form?.error && !errorField}<p id="pw-error" class="error" role="alert">{form.error}</p>{/if}
+			{#if form?.passwordChanged}
+				<p class="note ok" role="status">Password changed. Other devices were signed out.</p>
+			{/if}
+			<button type="submit" class="btn btn-primary btn-block" disabled={pwBusy} aria-busy={pwBusy}>
+				Change password
+			</button>
+		</form>
+	</section>
+
+	{#if data.user.role === 'admin'}
+		<section class="admin">
+			<a class="link-row" href={resolve('/admin/review')}>
+				<span>Open admin</span>
+				<IconCaretRight size={20} />
+			</a>
+		</section>
+	{/if}
+
+	<section>
+		<form method="POST" action="/logout">
+			<button type="submit" class="btn btn-quiet signout">Sign out</button>
+		</form>
+	</section>
+</div>
 
 <style>
-	section {
-		margin-bottom: 2rem;
+	.page {
+		padding: var(--sp-5) 0 var(--sp-6);
 	}
-	h3 {
-		margin: 0 0 0.5rem;
+	section {
+		margin-top: var(--sp-6);
+		padding-top: var(--sp-6);
+		border-top: 1px solid var(--line);
 	}
 	.who {
 		display: flex;
 		align-items: center;
-		gap: 1rem;
+		gap: var(--sp-4);
+		margin-top: var(--sp-5);
+		padding-top: 0;
+		border-top: 0;
 	}
-	dl {
-		margin: 0;
-	}
-	dt {
-		font-size: 0.75rem;
-		color: #6b7280;
-	}
-	dd {
-		margin: 0 0 0.4rem;
-		font-weight: 600;
-	}
-	.avatar {
-		width: 4.5rem;
-		height: 4.5rem;
-		border-radius: 50%;
-		object-fit: cover;
+	.face {
 		flex: none;
+		display: grid;
 	}
-	.avatar.preview {
-		display: block;
-		margin: 0.75rem 0;
+	.id {
+		min-width: 0;
 	}
-	.fallback {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		font-size: 1.4rem;
-		font-weight: 700;
-		color: #1d4ed8;
-		background: #dbeafe;
+	.name {
+		font: 800 28px / 1.1 var(--font-display);
+		letter-spacing: -0.02em;
+		overflow-wrap: anywhere;
+	}
+	.meta {
+		margin-top: 2px;
+		color: var(--muted);
+	}
+	h2 {
+		margin-bottom: var(--sp-4);
 	}
 	.file {
+		position: relative;
+		align-self: flex-start;
+	}
+	.file:has(input:focus-visible) {
+		outline: 2px solid var(--accent);
+		outline-offset: 2px;
+	}
+	.file.busy {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+	.preview {
 		display: block;
-		font-weight: 600;
+		width: 128px;
+		height: 128px;
+		border-radius: var(--r-av);
+		object-fit: cover;
 	}
-	.file input {
-		display: block;
-		margin-top: 0.4rem;
-		font-weight: 400;
+	.cluster .btn,
+	.stack > .btn {
+		width: auto;
 	}
-	.row {
-		display: flex;
-		gap: 0.75rem;
+	.note {
+		margin: 0;
+		font-size: var(--fs-ui);
+		line-height: 1.4;
 	}
-	.secondary {
-		margin-top: 0.75rem;
-		color: #374151;
-		background: transparent;
-		border: 1px solid #d1d5db;
-	}
-	.row .secondary {
-		margin-top: 0;
+	.note:empty {
+		display: none;
 	}
 	.ok {
-		color: #047857;
+		color: var(--accent-ink);
 	}
-	.error {
-		color: #b91c1c;
+	.bad {
+		color: var(--danger);
+	}
+	form {
+		display: flex;
+		flex-direction: column;
+		gap: var(--sp-4);
+	}
+	.admin {
+		padding-top: 0;
+	}
+	.link-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		min-height: 56px;
+		color: var(--accent-ink);
+		font-weight: 600;
+		text-decoration: none;
+	}
+	.signout {
+		width: 100%;
+	}
+
+	@media (min-width: 900px) {
+		.page {
+			max-width: 600px;
+			padding-top: var(--sp-6);
+		}
+		.signout {
+			width: auto;
+		}
 	}
 </style>

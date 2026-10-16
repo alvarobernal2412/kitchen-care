@@ -1,17 +1,8 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import AppShell from '$lib/components/AppShell.svelte';
-	import '$lib/styles/legacy.css'; // interim shim, see the file
 
 	let { data, children } = $props();
-
-	// Route prefixes that still have the old styling and need the `.legacy` shim (legacy.css).
-	// Home, Leaderboard, History and Feed are restyled. Remove entries as pages are restyled;
-	// delete the shim with the last one.
-	const LEGACY_PREFIXES = ['/profile', '/onboarding'];
-	const isLegacy = $derived(
-		LEGACY_PREFIXES.some((p) => page.url.pathname === p || page.url.pathname.startsWith(`${p}/`))
-	);
 </script>
 
 <AppShell
@@ -22,10 +13,7 @@
 	nav={data.nav}
 	pathname={page.url.pathname}
 >
-	<!-- Legacy page width only for the routes in LEGACY_PREFIXES. -->
-	<div class:legacy={isLegacy}>
-		{@render children()}
-	</div>
+	{@render children()}
 </AppShell>
 
 <style>
@@ -33,13 +21,14 @@
 	:global(body) {
 		margin: 0;
 	}
+	/* Default for bare <button>s (e.g. the camera overlay); restyled screens use .btn classes. */
 	:global(button) {
 		width: 100%;
 		padding: 0.8rem;
 		font: inherit;
 		font-weight: 600;
-		color: white;
-		background: #1d4ed8;
+		color: var(--on-accent);
+		background: var(--accent);
 		border: 0;
 		border-radius: 8px;
 		cursor: pointer;
@@ -47,10 +36,5 @@
 	:global(button:disabled) {
 		opacity: 0.6;
 		cursor: not-allowed;
-	}
-	.legacy {
-		max-width: 24rem;
-		margin: 0 auto;
-		padding: 1.5rem 0;
 	}
 </style>

@@ -2,40 +2,83 @@
 <html lang="en">
 	<head>
 		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<meta name="theme-color" content="#1d4ed8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+		<meta name="color-scheme" content="light dark" />
+		<meta name="theme-color" content="#edf0eb" media="(prefers-color-scheme: light)" />
+		<meta name="theme-color" content="#101613" media="(prefers-color-scheme: dark)" />
 		<title>Offline - Kitchen Care Credits</title>
+		<!-- Static on purpose: served from the service worker precache, no JS, no network. The
+		     custom properties repeat the app's design tokens (src/lib/styles/tokens.css). -->
 		<style>
+			:root {
+				color-scheme: light dark;
+				--ground: #edf0eb;
+				--ink: #1b2420;
+				--muted: #5c6860;
+				--accent: #127a68;
+				--accent-hover: #0e6657;
+				--on-accent: #f8faf6;
+			}
+			@media (prefers-color-scheme: dark) {
+				:root {
+					--ground: #101613;
+					--ink: #e8ede6;
+					--muted: #9aa89f;
+					--accent: #3fb59c;
+					--accent-hover: #55c4ac;
+					--on-accent: #0b1410;
+				}
+			}
+			* {
+				box-sizing: border-box;
+			}
 			body {
 				margin: 0;
-				min-height: 100vh;
-				display: flex;
-				align-items: center;
-				justify-content: center;
-				padding: 1rem;
-				box-sizing: border-box;
-				font-family: system-ui, sans-serif;
-				background: #f9fafb;
-				color: #111827;
+				min-height: 100dvh;
+				background: var(--ground);
+				color: var(--ink);
+				font: 400 16px/1.5 Geist, system-ui, -apple-system, 'Segoe UI', sans-serif;
 			}
 			main {
-				max-width: 24rem;
-				text-align: center;
+				max-width: 26rem;
+				margin: 0 auto;
+				padding: 64px 16px;
 			}
 			img {
-				width: 6rem;
-				height: 6rem;
-				border-radius: 1.5rem;
+				display: block;
+				width: 72px;
+				height: 72px;
+				margin-bottom: 32px;
+				border-radius: 16px;
+			}
+			h1 {
+				margin: 0;
+				font: 800 32px/1.05 'Bricolage Grotesque', 'Arial Narrow', system-ui, sans-serif;
+				letter-spacing: -0.02em;
+			}
+			p {
+				margin: 12px 0 0;
+				color: var(--muted);
 			}
 			a {
-				display: inline-block;
-				margin-top: 1rem;
-				padding: 0.6rem 1.2rem;
-				border-radius: 0.5rem;
-				background: #1d4ed8;
-				color: #fff;
-				text-decoration: none;
+				display: inline-flex;
+				align-items: center;
+				justify-content: center;
+				min-height: 44px;
+				margin-top: 24px;
+				padding: 0 20px;
+				border-radius: 10px;
+				background: var(--accent);
+				color: var(--on-accent);
 				font-weight: 600;
+				text-decoration: none;
+			}
+			a:hover {
+				background: var(--accent-hover);
+			}
+			a:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
 			}
 		</style>
 	</head>
@@ -43,8 +86,11 @@
 		<main>
 			<img src="/icons/icon-192.png" alt="" />
 			<h1>You're offline</h1>
-			<p>Kitchen Care Credits needs a connection to log chores and show your credits. Check your network and try again.</p>
-			<a href="/">Try again</a>
+			<p>
+				Kitchen Care Credits needs a connection to log chores and show your credits. Check your
+				network and try again.
+			</p>
+			<a href="">Try again</a>
 		</main>
 	</body>
 </html>

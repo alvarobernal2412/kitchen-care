@@ -92,7 +92,7 @@ test('uploading and removing an avatar', async ({ page }) => {
 	await expect(page.getByTestId('avatar-preview')).toBeVisible();
 	await page.getByRole('button', { name: 'Save photo' }).click();
 
-	const avatar = page.getByTestId('avatar');
+	const avatar = page.getByTestId('avatar').locator('img');
 	await expect(avatar).toBeVisible();
 	await expect(avatar).toHaveAttribute('src', /^\/media\/[0-9a-f]{32}\.webp$/);
 	// The image really loads from /media (naturalWidth is 0 for a broken image).
