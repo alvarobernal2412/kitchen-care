@@ -1,17 +1,24 @@
 name: Deploy
 
-# On every push to main: run the CI jobs, then build the image on the runner (never on the VPS),
-# stream it to the VPS over SSH to a forced-command key (deploy/remote-deploy.sh), and check the
-# public /healthz. If the deploy secrets are not configured yet, the deploy job skips cleanly.
+# On every push to main (or by hand): run the CI jobs on GitHub-hosted runners, then deploy with a
+# repo-scoped SELF-HOSTED runner that lives on the VPS and runs deploy/update.sh in the persistent
+# clone there (git pull, build, blue/green switch). No SSH key and no deploy secrets in GitHub.
+# This workflow never runs on pull_request, so untrusted code never reaches the self-hosted runner.
+#
+# The deploy job is skipped until the repository variable DEPLOY_ENABLED is 'true' (Settings >
+# Secrets and variables > Actions > Variables), so merging before a runner is registered neither
+# queues forever nor fails. See deploy/README.md.
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+# Never cancel a deploy mid-flight; a newer push queues behind the running one.
 concurrency:
-  group: deploy-production
+  group: deploy-main
   cancel-in-progress: false
 
 jobs:
@@ -19,95 +26,23 @@ jobs:
     uses: ./.github/workflows/ci.yml
 
   deploy:
-    name: Build and deploy
+    name: Deploy on the VPS
     needs: ci
-    runs-on: ubuntu-latest
+    if: ${{ vars.DEPLOY_ENABLED == 'true' }}
+    runs-on: [self-hosted, kitchen-care]
     timeout-minutes: 30
     environment: production
-    env:
-      DOMAIN: ${{ vars.DOMAIN || secrets.DOMAIN }}
     steps:
-      - name: Check deploy configuration
-        id: cfg
+      # No checkout step on purpose: the script updates the persistent clone on the VPS itself
+      # (git fetch + reset), and a checkout into the runner's workspace would deploy nothing.
+      - name: Update and deploy (deploy/update.sh)
         env:
-          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
-        run: |
-          missing=""
-          for v in DEPLOY_HOST DEPLOY_SSH_KEY DEPLOY_KNOWN_HOSTS DOMAIN; do
-            eval "val=\${$v:-}"
-            [ -n "$val" ] || missing="$missing $v"
-          done
-          if [ -n "$missing" ]; then
-            echo "::notice title=Deploy skipped::Not configured yet (missing:$missing). See deploy/README.md, section GitHub secrets."
-            echo "configured=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "configured=true" >> "$GITHUB_OUTPUT"
-          fi
+          # Optional repository variable; the script lives in the clone, /opt/kitchen-care by default.
+          DEPLOY_DIR: ${{ vars.DEPLOY_DIR }}
+        run: '"${DEPLOY_DIR:-/opt/kitchen-care}/deploy/update.sh"'
 
-      - uses: actions/checkout@v4
-        if: steps.cfg.outputs.configured == 'true'
-
-      - uses: docker/setup-buildx-action@v3
-        if: steps.cfg.outputs.configured == 'true'
-
-      - name: Compute image tag
-        if: steps.cfg.outputs.configured == 'true'
-        run: echo "TAG=$(printf '%s' "$GITHUB_SHA" | cut -c1-12)" >> "$GITHUB_ENV"
-
-      - name: Build image
-        if: steps.cfg.outputs.configured == 'true'
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: false
-          platforms: linux/amd64
-          tags: kitchen-care-app:${{ env.TAG }}
-          outputs: type=docker,dest=${{ runner.temp }}/image.tar
-          cache-from: type=gha,scope=app
-          cache-to: type=gha,scope=app,mode=max
-
-      - name: Assemble deploy stream
-        if: steps.cfg.outputs.configured == 'true'
-        run: |
-          set -eu
-          mkdir -p "$RUNNER_TEMP/stream/bundle"
-          gzip -c "$RUNNER_TEMP/image.tar" > "$RUNNER_TEMP/stream/image.tar.gz"
-          cp compose.yml "$RUNNER_TEMP/stream/bundle/"
-          cp -r deploy "$RUNNER_TEMP/stream/bundle/deploy"
-          rm -rf "$RUNNER_TEMP/stream/bundle/deploy/local"
-          tar -C "$RUNNER_TEMP/stream" -cf "$RUNNER_TEMP/stream.tar" image.tar.gz bundle
-          ls -l "$RUNNER_TEMP/stream.tar"
-
-      - name: Ship to the VPS and deploy
-        if: steps.cfg.outputs.configured == 'true'
+      - name: Check the public URL
+        if: ${{ vars.DOMAIN != '' }}
         env:
-          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
-        run: |
-          set -eu
-          umask 077
-          mkdir -p ~/.ssh
-          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
-          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
-          # The forced command on the VPS reads the stream and takes the tag as its argument.
-          ssh -i ~/.ssh/deploy_key \
-            -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
-            "${DEPLOY_USER:-root}@${DEPLOY_HOST}" "$TAG" < "$RUNNER_TEMP/stream.tar"
-
-      - name: Post-deploy check (public /healthz through NPM)
-        if: steps.cfg.outputs.configured == 'true'
-        run: |
-          for i in $(seq 1 12); do
-            if body=$(curl -fsS --max-time 10 "https://$DOMAIN/healthz") && printf '%s' "$body" | grep -q '"ok":true'; then
-              echo "healthy: https://$DOMAIN/healthz -> $body"
-              exit 0
-            fi
-            echo "attempt $i/12: not healthy yet"
-            sleep 5
-          done
-          echo "::error title=Post-deploy check failed::https://$DOMAIN/healthz did not return {\"ok\":true} within ~60s. The VPS deploy finished, so check the NPM Proxy Host for $DOMAIN (forward kitchen-care-proxy:80) and TLS."
-          exit 1
+          DOMAIN: ${{ vars.DOMAIN }}
+        run: curl --fail --silent --show-error --retry 12 --retry-delay 5 --retry-all-errors "https://$DOMAIN/healthz"
