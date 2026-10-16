@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark"><title>Onboarding</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600..800&family=Geist:wght@400..700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tokens.css"><style>
+.content { max-width: 480px; margin: 0 auto; padding-top: 24px; }
+.steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.steps i { height: 4px; background: var(--line); border-radius: 2px; }
+.steps i:first-child { background: var(--accent); }
+.stepno { margin-top: 12px; font-size: 14px; color: var(--muted); font-weight: 500; }
+h1 { font-size: 40px; line-height: 1; margin-top: 24px; }
+.lead { margin-top: 12px; font-size: 17px; line-height: 1.45; color: var(--ink); }
+.pts-list { list-style: none; margin: 24px 0 0; padding: 0; border-top: 2px solid var(--ink); }
+.pts-list li { display: grid; grid-template-columns: 1fr auto; align-items: center; min-height: 52px; border-bottom: 1px solid var(--line); gap: 16px; font-size: 16px; }
+.pts-list b { font: 800 28px/1 var(--font-display); letter-spacing: -0.03em; color: var(--accent-ink); }
+.note { margin-top: 12px; font-size: 14px; color: var(--muted); }
+.slogan { margin-top: 32px; }
+.slogan b { display: block; font: 800 30px/1.05 var(--font-display); letter-spacing: -0.02em; text-wrap: balance; }
+.slogan span { display: block; margin-top: 6px; font-size: 16px; color: var(--muted); text-wrap: balance; }
+.actions { margin-top: 32px; display: grid; gap: 8px; }
+</style></head>
+<body><div class="app"><div class="main"><main class="content">
+<div class="steps" aria-hidden="true"><i></i><i></i><i></i></div><div class="stepno">Step 1 of 3</div>
+<h1>How credits work</h1>
+<p class="lead">Log a chore in up to three taps and earn credits. Bigger jobs pay more and need a photo that an admin reviews.</p>
+<ul class="pts-list"><li><span>Cutlery back in the drawer</span><b>+1</b></li><li><span>Dishwasher</span><b>+2</b></li><li><span>Coffee grounds to the basement</span><b>+3</b></li><li><span>Bring milk</span><b>+3</b></li><li><span>Bring coffee beans</span><b>+5</b></li><li><span>Descale the coffee machine</span><b>+10</b></li><li><span>Deep clean the kitchen or fridge</span><b>+15</b></li></ul>
+<p class="note">Each chore has a short cooldown, so credits stay fair for everyone.</p>
+<div class="slogan"><b>Good karma pays out.</b><span>Rack up your credits for this semester's grand reward.</span></div>
+<div class="actions"><button class="btn block">Next</button><button class="btn plain block" style="min-height:48px">Skip</button></div></main></div></div></body></html>
