@@ -1,10 +1,11 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import type { FeedPost } from '$lib/feedTypes';
-	import { timeAgo } from '$lib/relativeTime';
 	import { avatarUrl } from '$lib/avatar';
+	import Avatar from './Avatar.svelte';
 	import Comments from './Comments.svelte';
 	import Reactions from './Reactions.svelte';
+	import RelativeTime from './RelativeTime.svelte';
 
 	let { post, meId }: { post: FeedPost; meId: number } = $props();
 
@@ -12,13 +13,15 @@
 	let confirming = $state(false);
 	let error = $state('');
 	let imageBroken = $state(false);
+	let imageLoaded = $state(false);
 	let img = $state<HTMLImageElement>();
 
-	const initials = (name: string) => name.slice(0, 2).toUpperCase();
-
-	// The proof may have been deleted by an admin; also covers an error that fired before hydration.
+	// The proof may have been deleted by an admin; also covers an event that fired before hydration.
 	onMount(() => {
-		if (img && img.complete && img.naturalWidth === 0) imageBroken = true;
+		if (img?.complete) {
+			if (img.naturalWidth === 0) imageBroken = true;
+			else imageLoaded = true;
+		}
 	});
 
 	async function remove() {
@@ -37,40 +40,46 @@
 {#if !gone}
 	<article class:milestone={post.milestone}>
 		<header>
-			{#if avatarUrl(post.author.avatar)}
-				<img class="avatar" src={avatarUrl(post.author.avatar)} alt="" />
-			{:else}
-				<span class="avatar fallback" aria-hidden="true">{initials(post.author.username)}</span>
-			{/if}
+			<Avatar
+				name={post.author.username}
+				src={avatarUrl(post.author.avatar)}
+				seed={post.author.id}
+				size={40}
+			/>
 			<div class="who">
 				<p class="name">
-					<strong>{post.author.username}</strong>
-					{#if post.author.deactivated}<span class="muted">(deactivated)</span>{/if}
+					<b>{post.author.username}</b>
+					{#if post.author.deactivated}<span class="muted">(left)</span>{/if}
 				</p>
 				<p class="meta">
-					{#if post.author.classification}<span class="chip">{post.author.classification}</span>{/if}
-					{#if post.author.department}<span class="chip">{post.author.department}</span>{/if}
-					<time datetime={post.createdAt} title={new Date(post.createdAt).toLocaleString()}>
-						{timeAgo(post.createdAt)}
-					</time>
+					{#if post.author.classification}<span>{post.author.classification}</span>{/if}
+					{#if post.author.department}<span>{post.author.department}</span>{/if}
+					<RelativeTime iso={post.createdAt} />
 				</p>
 			</div>
 		</header>
 
-		<p class="body">{post.body}</p>
-
-		{#if post.imagePath && !imageBroken}
-			<img
-				bind:this={img}
-				class="proof"
-				src={`/media/${post.imagePath}`}
-				loading="lazy"
-				alt={`Proof photo: ${post.milestone?.taskLabel ?? 'milestone'}`}
-				onerror={() => (imageBroken = true)}
-			/>
+		{#if post.body}
+			<p class={post.milestone ? 'headline' : 'body'}>{post.body}</p>
 		{/if}
 
-		<Reactions postId={post.id} counts={post.reactions} mine={post.mine} />
+		{#if post.imagePath && !imageBroken}
+			<div class="photo">
+				{#if !imageLoaded}<span class="skeleton shim" aria-hidden="true"></span>{/if}
+				<img
+					bind:this={img}
+					src={`/media/${post.imagePath}`}
+					loading="lazy"
+					alt={`Proof photo: ${post.milestone?.taskLabel ?? 'milestone'}`}
+					onload={() => (imageLoaded = true)}
+					onerror={() => (imageBroken = true)}
+				/>
+			</div>
+		{/if}
+
+		<div class="reacts">
+			<Reactions postId={post.id} counts={post.reactions} mine={post.mine} />
+		</div>
 		<Comments postId={post.id} count={post.commentCount} {meId} />
 
 		{#if post.author.id === meId}
@@ -78,114 +87,121 @@
 				{#if confirming}
 					<span class="confirm">
 						Delete?
-						<button type="button" class="mini danger" onclick={remove}>Yes</button>
-						<button type="button" class="mini" onclick={() => (confirming = false)}>No</button>
+						<button type="button" class="act danger" onclick={remove}>Yes</button>
+						<button type="button" class="act" onclick={() => (confirming = false)}>No</button>
 					</span>
 				{:else}
-					<button type="button" class="mini" onclick={() => (confirming = true)}>Delete post</button>
+					<button type="button" class="act" onclick={() => (confirming = true)}>Delete post</button>
 				{/if}
 			</div>
 		{/if}
-		{#if error}<p class="error" role="alert">{error}</p>{/if}
+		{#if error}<p class="err" role="alert">{error}</p>{/if}
 	</article>
 {/if}
 
 <style>
 	article {
-		padding: 0.9rem;
-		margin-bottom: 0.75rem;
-		background: white;
-		border: 1px solid #e5e7eb;
-		border-radius: 8px;
-	}
-	article.milestone {
-		background: #fffbeb;
-		border-color: #f59e0b;
+		padding: var(--sp-5) 0 var(--sp-2);
+		border-top: 1px solid var(--line);
 	}
 	header {
 		display: flex;
-		gap: 0.6rem;
 		align-items: center;
-	}
-	.avatar {
-		flex: none;
-		width: 2.25rem;
-		height: 2.25rem;
-		border-radius: 50%;
-		object-fit: cover;
-	}
-	.fallback {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		font-size: 0.8rem;
-		font-weight: 700;
-		color: #1d4ed8;
-		background: #dbeafe;
+		gap: var(--sp-3);
 	}
 	.who {
 		min-width: 0;
 	}
-	.name,
-	.meta {
-		margin: 0;
+	.name {
+		font-size: var(--fs-ui);
+		line-height: 1.2;
+		overflow-wrap: anywhere;
+	}
+	.name b {
+		font-weight: 600;
 	}
 	.meta {
 		display: flex;
 		flex-wrap: wrap;
-		gap: 0.3rem;
-		align-items: center;
-		font-size: 0.75rem;
-		color: #6b7280;
-	}
-	.chip {
-		padding: 0 0.45rem;
-		background: #f3f4f6;
-		border-radius: 999px;
+		gap: 0 var(--sp-2);
+		color: var(--muted);
+		font-size: var(--fs-small);
 	}
 	.muted {
-		font-size: 0.8rem;
-		color: #6b7280;
+		color: var(--muted);
+		font-size: var(--fs-small);
 	}
 	.body {
-		margin: 0.7rem 0;
+		max-width: none;
+		margin-top: var(--sp-3);
 		white-space: pre-wrap;
 		overflow-wrap: anywhere;
 	}
-	.proof {
-		display: block;
+	.headline {
+		max-width: none;
+		margin-top: var(--sp-3);
+		font: 700 24px / 1.12 var(--font-display);
+		letter-spacing: -0.02em;
+		white-space: pre-wrap;
+		overflow-wrap: anywhere;
+	}
+	.photo {
+		position: relative;
+		overflow: hidden;
+		aspect-ratio: 4 / 3;
+		margin-top: var(--sp-3);
+		border-radius: 10px;
+		background: var(--photo);
+	}
+	.shim {
+		position: absolute;
+		inset: 0;
+		border-radius: 0;
+	}
+	.photo img {
+		position: absolute;
+		inset: 0;
 		width: 100%;
-		max-height: 20rem;
-		margin-bottom: 0.7rem;
+		height: 100%;
 		object-fit: cover;
-		border-radius: 8px;
+	}
+	.reacts {
+		margin-top: var(--sp-3);
+	}
+	.act {
+		width: auto;
+		min-height: 44px;
+		padding: 0 var(--sp-3);
+		border: 1px solid transparent;
+		border-radius: var(--r-ctl);
+		background: transparent;
+		color: var(--muted);
+		font-size: var(--fs-small);
+		font-weight: 600;
+		cursor: pointer;
+	}
+	.act:hover {
+		background: var(--recess);
+	}
+	.act.danger {
+		border-color: var(--danger);
+		color: var(--danger);
+	}
+	.act.danger:hover {
+		background: var(--danger-wash);
 	}
 	.owner {
-		margin-top: 0.6rem;
-	}
-	.mini {
-		width: auto;
-		padding: 0.1rem 0.5rem;
-		font-size: 0.75rem;
-		font-weight: 500;
-		color: #374151;
-		background: #f3f4f6;
-		border: 1px solid #e5e7eb;
-	}
-	.mini.danger {
-		color: white;
-		background: #b91c1c;
-		border-color: #b91c1c;
+		margin-left: calc(var(--sp-3) * -1);
 	}
 	.confirm {
 		display: inline-flex;
 		align-items: center;
-		gap: 0.3rem;
-		font-size: 0.85rem;
+		gap: var(--sp-1);
+		padding-left: var(--sp-3);
+		font-size: var(--fs-small);
 	}
-	.error {
-		margin: 0.4rem 0 0;
-		font-size: 0.85rem;
-		color: #b91c1c;
+	.err {
+		color: var(--danger);
+		font-size: var(--fs-small);
 	}
 </style>

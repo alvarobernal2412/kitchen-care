@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { avatarUrl } from '$lib/avatar';
 	import type { FeedComment } from '$lib/feedTypes';
-	import { timeAgo } from '$lib/relativeTime';
+	import { IconCaretRight } from '$lib/icons';
+	import Avatar from './Avatar.svelte';
+	import RelativeTime from './RelativeTime.svelte';
 
 	let { postId, count, meId }: { postId: number; count: number; meId: number } = $props();
 
@@ -76,13 +78,12 @@
 			confirming = null;
 		}
 	}
-
-	const initials = (name: string) => name.slice(0, 2).toUpperCase();
 </script>
 
 <div class="comments">
 	<button type="button" class="toggle" aria-expanded={open} onclick={show}>
-		{open ? 'Hide comments' : 'Show comments'} ({total})
+		<IconCaretRight size={18} class="caret" />
+		<span><b>{total}</b> {total === 1 ? 'comment' : 'comments'}</span>
 	</button>
 
 	{#if open}
@@ -90,157 +91,161 @@
 		<ul>
 			{#each list as c (c.id)}
 				<li>
-					{#if avatarUrl(c.author.avatar)}
-						<img class="avatar" src={avatarUrl(c.author.avatar)} alt="" />
-					{:else}
-						<span class="avatar fallback" aria-hidden="true">{initials(c.author.username)}</span>
-					{/if}
+					<Avatar name={c.author.username} src={avatarUrl(c.author.avatar)} seed={c.author.id} size={32} />
 					<div class="content">
 						<p class="head">
-							<strong>{c.author.username}</strong>
-							{#if c.author.deactivated}<span class="muted">(deactivated)</span>{/if}
-							<time class="muted" datetime={c.createdAt} title={new Date(c.createdAt).toLocaleString()}>
-								{timeAgo(c.createdAt)}
-							</time>
+							<b class="who">{c.author.username}</b>
+							{#if c.author.deactivated}<span class="muted">(left)</span>{/if}
+							<RelativeTime iso={c.createdAt} class="muted" />
 						</p>
 						<p class="text">{c.body}</p>
 						{#if c.author.id === meId}
 							{#if confirming === c.id}
 								<span class="confirm">
 									Delete?
-									<button type="button" class="mini danger" onclick={() => remove(c.id)}>Yes</button>
-									<button type="button" class="mini" onclick={() => (confirming = null)}>No</button>
+									<button type="button" class="act danger" onclick={() => remove(c.id)}>Yes</button>
+									<button type="button" class="act" onclick={() => (confirming = null)}>No</button>
 								</span>
 							{:else}
-								<button type="button" class="mini" onclick={() => (confirming = c.id)}>Delete</button>
+								<button type="button" class="act" onclick={() => (confirming = c.id)}>Delete</button>
 							{/if}
 						{/if}
 					</div>
 				</li>
 			{/each}
 		</ul>
-		{#if loaded && list.length === 0}<p class="muted">No comments yet.</p>{/if}
+		{#if loaded && list.length === 0}<p class="muted none">No comments yet.</p>{/if}
 
 		<form onsubmit={send}>
-			<label class="sr" for={`comment-${postId}`}>Add a comment</label>
-			<input
-				id={`comment-${postId}`}
-				type="text"
-				maxlength="300"
-				placeholder="Add a comment"
-				autocomplete="off"
-				bind:value={draft}
-			/>
-			<button type="submit" class="send" disabled={sending || !draft.trim()}>Send</button>
+			<label class="label" for={`comment-${postId}`}>Add a comment</label>
+			<div class="send-row">
+				<input
+					id={`comment-${postId}`}
+					class="input"
+					type="text"
+					maxlength="300"
+					autocomplete="off"
+					bind:value={draft}
+				/>
+				<button type="submit" class="btn btn-primary send" disabled={sending || !draft.trim()}>
+					Send
+				</button>
+			</div>
 		</form>
 	{/if}
-	{#if error}<p class="error" role="alert">{error}</p>{/if}
+	{#if error}<p class="err" role="alert">{error}</p>{/if}
 </div>
 
 <style>
-	.comments {
-		margin-top: 0.6rem;
-	}
 	.toggle {
+		display: flex;
+		align-items: center;
+		gap: 6px;
 		width: auto;
-		padding: 0.2rem 0;
-		font-size: 0.85rem;
-		color: #1d4ed8;
+		min-height: 44px;
+		padding: 0 2px;
+		border: 0;
 		background: transparent;
+		color: var(--muted);
+		font-size: 14px;
+		font-weight: 400;
+		cursor: pointer;
+	}
+	.toggle b {
+		color: var(--ink);
+		font-weight: 600;
+	}
+	.toggle :global(.caret) {
+		transition: transform var(--dur-fast) var(--ease-out);
+	}
+	.toggle[aria-expanded='true'] :global(.caret) {
+		transform: rotate(90deg);
 	}
 	ul {
+		margin: 0;
 		padding: 0;
-		margin: 0.5rem 0;
 		list-style: none;
 	}
 	li {
 		display: flex;
-		gap: 0.5rem;
-		margin-bottom: 0.6rem;
-	}
-	.avatar {
-		flex: none;
-		width: 1.75rem;
-		height: 1.75rem;
-		border-radius: 50%;
-		object-fit: cover;
-	}
-	.fallback {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		font-size: 0.65rem;
-		font-weight: 700;
-		color: #1d4ed8;
-		background: #dbeafe;
+		gap: var(--sp-3);
+		padding: var(--sp-3) 0;
+		border-top: 1px solid var(--line);
 	}
 	.content {
 		min-width: 0;
 		flex: 1;
 	}
-	.head,
-	.text {
-		margin: 0;
-	}
 	.head {
-		font-size: 0.8rem;
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 0 var(--sp-2);
+		font-size: var(--fs-small);
+	}
+	.who {
+		overflow-wrap: anywhere;
+		font-weight: 600;
 	}
 	.text {
-		font-size: 0.9rem;
+		font-size: 15px;
 		white-space: pre-wrap;
 		overflow-wrap: anywhere;
 	}
 	.muted {
-		margin: 0;
-		font-size: 0.8rem;
-		color: #6b7280;
+		color: var(--muted);
+		font-size: var(--fs-small);
+	}
+	.none {
+		padding-bottom: var(--sp-3);
 	}
 	form {
-		display: flex;
-		gap: 0.4rem;
+		margin-top: var(--sp-2);
 	}
-	input {
+	.send-row {
+		display: flex;
+		gap: var(--sp-2);
+		margin-top: 6px;
+	}
+	.send-row .input {
 		flex: 1;
 		min-width: 0;
-		padding: 0.5rem;
-		font: inherit;
-		border: 1px solid #d1d5db;
-		border-radius: 8px;
 	}
 	.send {
 		width: auto;
-		padding: 0.5rem 0.9rem;
+		flex: none;
 	}
-	.mini {
+	.act {
 		width: auto;
-		padding: 0.1rem 0.5rem;
-		font-size: 0.75rem;
-		font-weight: 500;
-		color: #374151;
-		background: #f3f4f6;
-		border: 1px solid #e5e7eb;
+		min-height: 44px;
+		padding: 0 var(--sp-3);
+		border: 1px solid transparent;
+		border-radius: var(--r-ctl);
+		background: transparent;
+		color: var(--muted);
+		font-size: var(--fs-small);
+		font-weight: 600;
+		cursor: pointer;
 	}
-	.mini.danger {
-		color: white;
-		background: #b91c1c;
-		border-color: #b91c1c;
+	.act:hover {
+		background: var(--recess);
+	}
+	.act.danger {
+		border-color: var(--danger);
+		color: var(--danger);
+	}
+	.act.danger:hover {
+		background: var(--danger-wash);
 	}
 	.confirm {
 		display: inline-flex;
 		align-items: center;
-		gap: 0.3rem;
-		font-size: 0.8rem;
+		gap: var(--sp-1);
+		font-size: var(--fs-small);
 	}
-	.error {
-		margin: 0.4rem 0 0;
-		font-size: 0.85rem;
-		color: #b91c1c;
-	}
-	.sr {
-		position: absolute;
-		width: 1px;
-		height: 1px;
-		overflow: hidden;
-		clip-path: inset(50%);
+	.err {
+		margin-top: var(--sp-2);
+		color: var(--danger);
+		font-size: var(--fs-small);
 	}
 </style>

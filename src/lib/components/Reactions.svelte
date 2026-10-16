@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { EMOJIS, reactionLabel, type Emoji } from '$lib/emoji';
+	import { IconCheck } from '$lib/icons';
 
 	let {
 		postId,
@@ -50,17 +51,19 @@
 
 <div class="bar" role="group" aria-label="Reactions">
 	{#each EMOJIS as emoji (emoji)}
+		{@const on = own.includes(emoji)}
 		<button
 			type="button"
-			class="chip"
-			class:on={own.includes(emoji)}
-			aria-pressed={own.includes(emoji)}
+			class="react"
+			class:on
+			aria-pressed={on}
 			aria-label={reactionLabel(emoji, current[emoji])}
 			disabled={pending}
 			onclick={() => toggle(emoji)}
 		>
-			<span aria-hidden="true">{emoji}</span>
-			<span class="n">{current[emoji]}</span>
+			<span class="e" aria-hidden="true">{emoji}</span>
+			{#if current[emoji] > 0}<span class="n" aria-hidden="true">{current[emoji]}</span>{/if}
+			{#if on}<IconCheck size={14} class="tick" />{/if}
 		</button>
 	{/each}
 </div>
@@ -70,33 +73,58 @@
 	.bar {
 		display: flex;
 		flex-wrap: wrap;
-		gap: 0.35rem;
+		gap: 6px;
 	}
-	.chip {
+	.react {
 		display: inline-flex;
 		align-items: center;
-		gap: 0.3rem;
+		justify-content: center;
+		gap: var(--sp-1);
 		width: auto;
-		padding: 0.3rem 0.6rem;
-		font-weight: 500;
-		color: #374151;
-		background: #f3f4f6;
-		border: 1px solid #e5e7eb;
-		border-radius: 999px;
+		min-width: 44px;
+		min-height: 44px;
+		padding: 0 var(--sp-3);
+		border: 1px solid var(--line);
+		border-radius: var(--r-chip);
+		background: transparent;
+		color: var(--ink);
+		font-size: 14px;
+		font-weight: 600;
+		cursor: pointer;
+		transition:
+			background-color var(--dur-fast) var(--ease-out),
+			transform var(--dur-fast) var(--ease-press);
 	}
-	.chip.on {
-		color: #1d4ed8;
-		background: #eff6ff;
-		border-color: #1d4ed8;
+	.react:hover:not(:disabled) {
+		background: var(--recess);
+	}
+	.react:active:not(:disabled) {
+		transform: scale(0.95);
+	}
+	.react:disabled {
+		opacity: 1;
+		cursor: progress;
+	}
+	.react.on,
+	.react.on:hover:not(:disabled) {
+		border-color: var(--accent);
+		background: var(--accent-wash);
+		color: var(--accent-ink);
+		box-shadow: inset 0 0 0 1px var(--accent);
+	}
+	.e {
+		font-size: 17px;
+		line-height: 1;
 	}
 	.n {
-		min-width: 0.6rem;
-		font-size: 0.85rem;
 		font-variant-numeric: tabular-nums;
 	}
+	.react :global(.tick) {
+		flex: none;
+	}
 	.error {
-		margin: 0.4rem 0 0;
-		font-size: 0.85rem;
-		color: #b91c1c;
+		margin-top: var(--sp-2);
+		color: var(--danger);
+		font-size: var(--fs-small);
 	}
 </style>
