@@ -1,8 +1,0 @@
-# Optional override for setups where NPM reaches services by host port instead of a shared Docker
-# network. Publishes the proxy on loopback ONLY. Use with:
-#   COMPOSE_FILE=compose.yml:compose.hostport.yml   (in .env)  and PROXY_HOST_PORT=8081
-# NPM then forwards to the host's address on that port. See deploy/README.md.
-services:
-  kitchen-care-proxy:
-    ports:
-      - '127.0.0.1:${PROXY_HOST_PORT:?set PROXY_HOST_PORT in .env}:80'

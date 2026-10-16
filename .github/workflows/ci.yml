@@ -43,6 +43,8 @@ jobs:
       - run: npm run lint
       - run: npm run check
       - run: npm test
+      - name: Deploy script tests
+        run: sh deploy/tests/test-verify-image.sh
 
   e2e:
     name: Playwright e2e
