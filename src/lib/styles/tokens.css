@@ -1,0 +1,131 @@
+/*
+ * Design tokens. Ported from docs/design/mockups/tokens.css (the approved source of truth).
+ * Light values first, then one dark block; tests/unit/tokenContrast.test.ts parses this file
+ * and relies on that order (every colour that needs AA contrast must be a 6-digit hex).
+ */
+:root {
+	color-scheme: light dark;
+
+	/* surfaces */
+	--ground: #edf0eb;
+	--surface: #f8faf6;
+	--line: #d3d9d0;
+	--recess: #e3e8e0;
+	--glaze: #dde5dd;
+	--photo: #d5ddd2;
+
+	/* text */
+	--ink: #1b2420;
+	--muted: #5e6a62;
+
+	/* accent (enamel teal) */
+	--accent: #127a68;
+	--accent-hover: #0e6657;
+	--accent-press: #0b5a4c;
+	--accent-wash: #dcebe6;
+	--accent-ink: #0b5a4c;
+	--on-accent: #f8faf6;
+
+	/* states */
+	--pending: #9a6a12;
+	--pending-ink: #7c5509;
+	--pending-wash: #f6ecd4;
+	--danger: #a63d2f;
+	--danger-wash: #f4e2de;
+
+	/* avatar tints: green-tinted neutrals with their initials colour */
+	--avatar-1-bg: #d2e2da;
+	--avatar-1-fg: #153a30;
+	--avatar-2-bg: #dde3ce;
+	--avatar-2-fg: #2b3414;
+	--avatar-3-bg: #d0dde0;
+	--avatar-3-fg: #15343b;
+	--avatar-4-bg: #e3dfd0;
+	--avatar-4-fg: #3a3315;
+	--avatar-5-bg: #d9dbe4;
+	--avatar-5-fg: #2a2d45;
+	--avatar-6-bg: #e0d8d4;
+	--avatar-6-fg: #45302a;
+
+	/* shadows are tinted with the ground hue, never neutral grey */
+	--shadow-tint: 40 60 50;
+	--shadow-bar: 0 -6px 18px -8px rgb(var(--shadow-tint) / 0.22);
+	--shadow-lip: 0 3px 0 0 rgb(var(--shadow-tint) / 0.28);
+
+	/* type */
+	--font-display: 'Bricolage Grotesque', 'Arial Narrow', system-ui, sans-serif;
+	--font-body: 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif;
+	--fs-hero: 72px; /* line-height 0.9, display 800 */
+	--fs-points: 52px; /* line-height 0.95, display 800 */
+	--fs-h1: 32px; /* line-height 1.05 */
+	--fs-h2: 22px; /* line-height 1.15 */
+	--fs-lead: 17px; /* line-height 1.45 */
+	--fs-body: 16px; /* line-height 1.5 */
+	--fs-ui: 15px; /* line-height 1.35 */
+	--fs-small: 13px; /* line-height 1.4 */
+
+	/* spacing (gutter is 16 on phones, 32 on desktop) */
+	--sp-1: 4px;
+	--sp-2: 8px;
+	--sp-3: 12px;
+	--sp-4: 16px;
+	--sp-5: 24px;
+	--sp-6: 32px;
+	--sp-7: 48px;
+	--sp-8: 64px;
+	--gutter: 16px;
+
+	/* radii: no pills */
+	--r-tile: 20px;
+	--r-ctl: 10px;
+	--r-chip: 6px;
+	--r-av: 12px;
+
+	/* motion: 150-200ms, transform/opacity/colour only */
+	--ease-press: cubic-bezier(0.3, 1.4, 0.5, 1);
+	--ease-out: ease-out;
+	--dur-fast: 150ms;
+	--dur-base: 180ms;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		--ground: #101613;
+		--surface: #18211c;
+		--line: #2a362f;
+		--recess: #1c2620;
+		--glaze: #243229;
+		--photo: #223029;
+
+		--ink: #e8ede6;
+		--muted: #9aa89f;
+
+		--accent: #3fb59c;
+		--accent-hover: #55c4ac;
+		--accent-press: #2fa38b;
+		--accent-wash: #1f3a33;
+		--accent-ink: #7ad6c2;
+		--on-accent: #0b1410;
+
+		--pending: #d9a441;
+		--pending-ink: #e0b35a;
+		--pending-wash: #2e2613;
+		--danger: #e0806f;
+		--danger-wash: #35201c;
+
+		--avatar-1-bg: #25403a;
+		--avatar-1-fg: #bfe8dc;
+		--avatar-2-bg: #333b25;
+		--avatar-2-fg: #dce5b8;
+		--avatar-3-bg: #243a41;
+		--avatar-3-fg: #bde0ea;
+		--avatar-4-bg: #3b3626;
+		--avatar-4-fg: #e8deb4;
+		--avatar-5-bg: #2e3041;
+		--avatar-5-fg: #cdd0f0;
+		--avatar-6-bg: #3c2f2b;
+		--avatar-6-fg: #edcfc6;
+
+		--shadow-tint: 0 0 0;
+	}
+}
