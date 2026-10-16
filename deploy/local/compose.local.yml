@@ -1,9 +1,12 @@
 # Local, TLS-free stand-in for "NPM in front of the stack". NOT for production.
-# Usage (see deploy/README.md, "Try it locally"): create the network, then
+# Usage: create the network, put these in .env next to compose.yml (plus the other required
+# variables, DOMAIN=kitchen.local and ORIGIN=https://kitchen.local), then run deploy/update.sh
+# from a clone of the repository:
 #   docker network create npm-sim
 #   .env: COMPOSE_PROJECT_NAME=kitchen-care-local, COMPOSE_PATH_SEPARATOR=:,
 #         COMPOSE_FILE=compose.yml:deploy/local/compose.local.yml, NPM_NETWORK=npm-sim, ...
 #   docker compose --profile sim up -d npm-sim     # reachable at http://127.0.0.1:8080
+#   docker compose --profile '*' down -v           # tear everything down
 services:
   npm-sim:
     image: nginx:1.28-alpine

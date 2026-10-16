@@ -48,4 +48,6 @@ The service worker and manifest are active in production builds. On Android Chro
 ## Deployment
 
 Production runs as a Docker stack behind an existing Nginx Proxy Manager on a VPS, deployed by
-GitHub Actions on push to `main` with a blue/green switch. See `deploy/README.md` for the runbook.
+a self-hosted GitHub Actions runner on the VPS on push to `main` (`deploy/update.sh` pulls, builds
+and does a blue/green switch). Set the repository variable `DEPLOY_ENABLED=true` to turn the deploy
+job on; until then it is skipped. See `deploy/README.md` for the runbook.
