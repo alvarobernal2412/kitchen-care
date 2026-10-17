@@ -77,6 +77,21 @@ const TEXT: [string, string][] = [
 	['danger', 'ground'], // .error, .btn-danger
 	['danger', 'surface'],
 	['danger', 'danger-wash'], // .chip-danger, .btn-danger hover
+	// heatmap cell counts (step 0 is --recess)
+	['ink', 'heat-1'],
+	['ink', 'heat-2'],
+	['on-accent', 'heat-3'],
+	['on-accent', 'heat-4'],
+	// camera overlay (the same in both schemes)
+	['cam-fg', 'cam-bg'],
+	['cam-muted', 'cam-bg'],
+	['cam-fg', 'cam-bar'],
+	['cam-muted', 'cam-bar'],
+	['cam-on-accent', 'cam-accent'], // "Use photo"
+	['cam-accent', 'cam-bg'],
+	['cam-warn-fg', 'cam-warn-bg'], // detection banner
+	['cam-error-fg', 'cam-error-bg'], // permission errors
+	['cam-focus', 'cam-bar'],
 	...[1, 2, 3, 4, 5, 6].map((n): [string, string] => [`avatar-${n}-fg`, `avatar-${n}-bg`])
 ];
 // Focus ring, active indicator and invalid-field border are non-text.
@@ -84,7 +99,15 @@ const NON_TEXT: [string, string][] = [
 	['accent', 'ground'],
 	['accent', 'surface'],
 	['danger', 'ground'],
-	['danger', 'surface']
+	['danger', 'surface'],
+	// chart marks against the surface they are drawn on
+	['chart-1', 'surface'],
+	['chart-2', 'surface'],
+	['chart-1', 'ground'],
+	['chart-2', 'ground'],
+	// camera focus ring and shutter on the dark overlay
+	['cam-focus', 'cam-bg'],
+	['cam-fg', 'cam-bg']
 ];
 
 describe.each([

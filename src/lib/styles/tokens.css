@@ -33,6 +33,28 @@
 	--danger: #a63d2f;
 	--danger-wash: #f4e2de;
 
+	/* charts: one teal hue; marks need 3:1 against the surface, cell text 4.5:1 (tokenContrast test) */
+	--chart-1: #3a9684; /* secondary series, drawn hatched */
+	--chart-2: #0b5a4c; /* primary series, drawn solid */
+	--heat-1: #c9e0d8;
+	--heat-2: #8cc4b4;
+	--heat-3: #127a68;
+	--heat-4: #0b5a4c;
+
+	/* camera overlay: always dark, whatever the colour scheme */
+	--cam-bg: #0b100d;
+	--cam-bar: #151c17;
+	--cam-fg: #f1f4ef;
+	--cam-muted: #aab6ad;
+	--cam-line: #3a4a40;
+	--cam-accent: #3fb59c;
+	--cam-on-accent: #0b1410;
+	--cam-focus: #7ad6c2;
+	--cam-warn-bg: #3a2c0e;
+	--cam-warn-fg: #f0c77a;
+	--cam-error-bg: #3a1d18;
+	--cam-error-fg: #f4b3a6;
+
 	/* avatar tints: green-tinted neutrals with their initials colour */
 	--avatar-1-bg: #d2e2da;
 	--avatar-1-fg: #153a30;
@@ -55,6 +77,7 @@
 	/* type */
 	--font-display: 'Bricolage Grotesque', 'Arial Narrow', system-ui, sans-serif;
 	--font-body: 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif;
+	--font-mono: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace; /* the reset link only */
 	--fs-hero: 72px; /* line-height 0.9, display 800 */
 	--fs-points: 52px; /* line-height 0.95, display 800 */
 	--fs-h1: 32px; /* line-height 1.05 */
@@ -123,6 +146,26 @@
 		--pending-wash: #2e2613;
 		--danger: #e0806f;
 		--danger-wash: #35201c;
+
+		--chart-1: #3a9684;
+		--chart-2: #7ad6c2;
+		--heat-1: #24473f;
+		--heat-2: #2f6f5f;
+		--heat-3: #3fb59c;
+		--heat-4: #7ad6c2;
+
+		--cam-bg: #0b100d;
+		--cam-bar: #151c17;
+		--cam-fg: #f1f4ef;
+		--cam-muted: #aab6ad;
+		--cam-line: #3a4a40;
+		--cam-accent: #3fb59c;
+		--cam-on-accent: #0b1410;
+		--cam-focus: #7ad6c2;
+		--cam-warn-bg: #3a2c0e;
+		--cam-warn-fg: #f0c77a;
+		--cam-error-bg: #3a1d18;
+		--cam-error-fg: #f4b3a6;
 
 		--avatar-1-bg: #25403a;
 		--avatar-1-fg: #bfe8dc;
