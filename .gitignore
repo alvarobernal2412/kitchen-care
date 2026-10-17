@@ -10,6 +10,7 @@ playwright-report/
 .superpowers/
 .claude/
 build-scripts/
+build-scripts-dev/
 state/
 
 # Last-known-good copies kept by deploy/update.sh while a deploy is in flight.

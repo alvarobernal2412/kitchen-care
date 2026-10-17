@@ -15,6 +15,6 @@ export default ts.config(
 		languageOptions: { parserOptions: { parser: ts.parser } }
 	},
 	{
-		ignores: ['build/', 'build-scripts/', '.svelte-kit/', 'node_modules/', 'playwright-report/', 'test-results/', '.claude/', '.superpowers/']
+		ignores: ['build/', 'build-scripts/', 'build-scripts-dev/', '.svelte-kit/', 'node_modules/', 'playwright-report/', 'test-results/', '.claude/', '.superpowers/']
 	}
 );
