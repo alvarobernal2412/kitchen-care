@@ -22,6 +22,7 @@ describe('nav items', () => {
 		expect(ADMIN_NAV_ITEMS.map((i) => i.label)).toEqual([
 			'Periods',
 			'Review',
+			'Activity',
 			'Users',
 			'Moderation',
 			'Images',

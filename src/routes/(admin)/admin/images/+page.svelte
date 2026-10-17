@@ -9,7 +9,8 @@
 	const STATUS = {
 		approved: { label: 'Approved', cls: '' },
 		pending: { label: 'Pending', cls: 'chip-pending' },
-		rejected: { label: 'Rejected', cls: 'chip-danger' }
+		rejected: { label: 'Rejected', cls: 'chip-danger' },
+		revoked: { label: 'Revoked', cls: 'chip-neutral' }
 	} as const;
 	const statusOf = (s: string) => STATUS[s as keyof typeof STATUS] ?? { label: s, cls: 'chip-neutral' };
 </script>

@@ -170,6 +170,12 @@
 								<input type="hidden" name="userId" value={u.id} />
 								<button type="submit" class="btn btn-quiet">Generate reset link</button>
 							</form>
+
+							<div class="act">
+								<a class="btn btn-quiet" href="{resolve('/admin/activity')}?user={encodeURIComponent(u.username)}"
+									>View activity<span class="visually-hidden"> of {u.username}</span></a
+								>
+							</div>
 						</div>
 					</details>
 				</li>
@@ -314,7 +320,7 @@
 			gap: 2px;
 		}
 		.panel {
-			grid-template-columns: repeat(3, minmax(0, 1fr));
+			grid-template-columns: repeat(4, minmax(0, 1fr));
 			gap: var(--sp-5);
 		}
 		.act + .act {

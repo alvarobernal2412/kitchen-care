@@ -94,6 +94,7 @@ test.describe('phone', () => {
 		await expect(sections.getByRole('link')).toHaveText([
 			'Periods',
 			'Review',
+			'Activity',
 			'Users',
 			'Moderation',
 			'Images',
@@ -263,7 +264,7 @@ test.describe('laptop sidebar', () => {
 		await loginAsAdmin(page);
 		await page.goto('/admin/review');
 		const nav = mainNav(page);
-		for (const name of ['Periods', 'Review', 'Users', 'Moderation', 'Images', 'Analytics']) {
+		for (const name of ['Periods', 'Review', 'Activity', 'Users', 'Moderation', 'Images', 'Analytics']) {
 			await expect(nav.getByRole('link', { name: new RegExp(`^${name}`) })).toBeVisible();
 		}
 		await expect(nav.getByRole('link', { name: /^Review/ })).toHaveAttribute('aria-current', 'page');

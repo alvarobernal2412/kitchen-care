@@ -32,6 +32,7 @@ const TARGETS: Target[] = [
 	{ name: '404', path: '/no-such-page', role: 'member' },
 	{ name: 'offline page', path: '/offline/', role: 'anon' },
 	{ name: 'admin review', path: '/admin/review', role: 'admin' },
+	{ name: 'admin activity', path: '/admin/activity', role: 'admin' },
 	{ name: 'admin users', path: '/admin/users', role: 'admin' },
 	{ name: 'admin moderation', path: '/admin/moderation', role: 'admin' },
 	{ name: 'admin images', path: '/admin/images', role: 'admin' },

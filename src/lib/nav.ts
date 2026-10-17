@@ -9,6 +9,7 @@ import {
 	IconHome,
 	IconImages,
 	IconInbox,
+	IconList,
 	IconUser,
 	IconUsers
 } from '$lib/icons';
@@ -69,6 +70,7 @@ const admin = (id: string, label: string, icon: NavItem['icon']): NavItem => ({
 export const ADMIN_NAV_ITEMS: NavItem[] = [
 	admin('periods', 'Periods', IconCalendar),
 	admin('review', 'Review', IconInbox),
+	admin('activity', 'Activity', IconList),
 	admin('users', 'Users', IconUsers),
 	admin('moderation', 'Moderation', IconFlag),
 	admin('images', 'Images', IconImages),

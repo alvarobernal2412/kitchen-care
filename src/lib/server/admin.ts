@@ -47,7 +47,7 @@ export type AdminUserRow = {
 };
 
 /** Lower-cased, trimmed search text with LIKE wildcards (and the escape character) made literal. */
-function escapeLike(q: string): string {
+export function escapeLike(q: string): string {
 	return q.trim().toLowerCase().replace(/[\\%_]/g, '\\$&');
 }
 
@@ -164,7 +164,7 @@ export async function setActive(
 export type ProofImageRow = {
 	id: number;
 	imagePath: string;
-	status: 'pending' | 'approved' | 'rejected';
+	status: 'pending' | 'approved' | 'rejected' | 'revoked';
 	createdAt: Date;
 	taskKey: string;
 	taskLabel: string;

@@ -17,3 +17,4 @@ export { default as IconImages } from './IconImages.svelte';
 export { default as IconUsers } from './IconUsers.svelte';
 export { default as IconFlag } from './IconFlag.svelte';
 export { default as IconInbox } from './IconInbox.svelte';
+export { default as IconList } from './IconList.svelte';
