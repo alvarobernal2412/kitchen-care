@@ -1,24 +1,26 @@
-import { randomBytes } from 'node:crypto';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import postgres from 'postgres';
+import { inject } from 'vitest';
 import * as schema from '../../src/lib/server/db/schema';
 import type { Db } from '../../src/lib/server/db';
-import { TEMPLATE_NAME, testBaseUrl } from './testDbUrl';
+import { newTestDbName, testBaseUrl } from './testDbUrl';
 
 export type TestDb = { db: Db; close: () => Promise<void> };
 
 /**
  * Creates a uniquely named throwaway database next to the configured one and returns a Db.
- * It is a copy of the migrated template that tests/globalSetup.ts builds once per run; without
- * that template (a single file run with another config) it falls back to migrating per file.
+ * It is a copy of this run's migrated template (built once by tests/globalSetup.ts, which hands
+ * the name over with vitest's inject); without that template (a single file run with another
+ * config) it falls back to migrating per file.
  * close() ends connections and drops it. If setup fails part-way, the same teardown runs before
  * the error is rethrown. (Generated migrations reference "public".*, so a schema-per-test would
  * not work.)
  */
 export async function getTestDb(): Promise<TestDb> {
 	const base = testBaseUrl();
-	const name = `kc_test_${randomBytes(6).toString('hex')}`;
+	const name = newTestDbName('db');
+	const template = inject('kcTestTemplate');
 	const testUrl = new URL(base);
 	testUrl.pathname = `/${name}`;
 
@@ -32,12 +34,11 @@ export async function getTestDb(): Promise<TestDb> {
 	};
 
 	try {
-		const [tpl] = await admin`select 1 as one from pg_database where datname = ${TEMPLATE_NAME}`;
-		if (tpl) {
-			await admin.unsafe(`create database "${name}" template "${TEMPLATE_NAME}"`);
+		if (template) {
+			await admin.unsafe(`create database "${name}" template "${template}"`);
 			return { db: drizzle(client, { schema }), close };
 		}
-		console.warn(`${TEMPLATE_NAME} not found: migrating a per-file test database instead`);
+		console.warn('no template database for this run: migrating a per-file test database instead');
 		await admin.unsafe(`create database "${name}"`);
 		const db = drizzle(client, { schema });
 		await migrate(db, { migrationsFolder: './drizzle' });
