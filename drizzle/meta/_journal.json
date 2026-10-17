@@ -29,6 +29,20 @@
       "when": 1792244613312,
       "tag": "0003_welcome_bonus_once",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792245047380,
+      "tag": "0004_submission_revoked",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792245049436,
+      "tag": "0005_grounds_needs_review",
+      "breakpoints": true
     }
   ]
 }

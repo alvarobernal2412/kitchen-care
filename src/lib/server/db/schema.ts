@@ -126,14 +126,18 @@ export const submissions = pgTable(
 			.notNull()
 			.references(() => tasks.key),
 		periodId: integer('period_id').references(() => periods.id),
-		status: text('status', { enum: ['pending', 'approved', 'rejected'] }).notNull(),
+		status: text('status', { enum: ['pending', 'approved', 'rejected', 'revoked'] }).notNull(),
 		pointsAwarded: integer('points_awarded').notNull().default(0),
 		imagePath: text('image_path'),
 		imageRemovedAt: timestamp('image_removed_at', { withTimezone: true }),
 		rejectReason: text('reject_reason'),
 		createdAt: createdAt(),
 		reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
-		reviewedBy: integer('reviewed_by').references(() => users.id)
+		reviewedBy: integer('reviewed_by').references(() => users.id),
+		// An admin removed an approved chore: the row stays for audit but scores nothing.
+		revokedAt: timestamp('revoked_at', { withTimezone: true }),
+		revokedBy: integer('revoked_by').references(() => users.id),
+		revokeReason: text('revoke_reason')
 	},
 	(t) => [
 		index('submissions_user_task_idx').on(t.userId, t.taskKey, t.createdAt),
