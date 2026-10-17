@@ -14,3 +14,6 @@ state/
 
 # Last-known-good copies kept by deploy/update.sh while a deploy is in flight.
 deploy/nginx/*.prev
+
+# Screenshots written by scripts/screenshots.mjs.
+tmp/
