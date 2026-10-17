@@ -41,6 +41,26 @@ export function normalizeUsername(s: string): string {
 	return s.trim().toLowerCase();
 }
 
+/** The username is already used by another account (case-insensitively). */
+export class UsernameTakenError extends AuthError {
+	constructor() {
+		super('username_taken', 'That username is taken.');
+		this.name = 'UsernameTakenError';
+	}
+}
+
+/** Trims and checks a username; returns the display form and the unique lookup key. */
+export function parseUsername(raw: string): { display: string; normalized: string } {
+	const normalized = normalizeUsername(raw);
+	if (normalized.length < USERNAME_MIN || normalized.length > USERNAME_MAX || !USERNAME_RE.test(normalized)) {
+		throw new AuthError(
+			'invalid_username',
+			`Username must be ${USERNAME_MIN}-${USERNAME_MAX} characters: letters, digits, ".", "_" or "-".`
+		);
+	}
+	return { display: raw.trim(), normalized };
+}
+
 /** Strips the password hash from a full users row. */
 export function toUser(row: typeof users.$inferSelect): User {
 	// eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -48,7 +68,7 @@ export function toUser(row: typeof users.$inferSelect): User {
 	return user;
 }
 
-function isUniqueViolation(err: unknown): boolean {
+export function isUniqueViolation(err: unknown): boolean {
 	for (let e = err as { code?: string; cause?: unknown } | undefined; e; e = e.cause as typeof e) {
 		if (e.code === '23505') return true;
 	}
@@ -65,14 +85,7 @@ export async function signUp(
 	opts: { now?: Date } = {}
 ): Promise<User> {
 	const now = opts.now ?? new Date();
-	const display = input.username.trim();
-	const normalized = normalizeUsername(input.username);
-	if (normalized.length < USERNAME_MIN || normalized.length > USERNAME_MAX || !USERNAME_RE.test(normalized)) {
-		throw new AuthError(
-			'invalid_username',
-			`Username must be ${USERNAME_MIN}-${USERNAME_MAX} characters: letters, digits, ".", "_" or "-".`
-		);
-	}
+	const { display, normalized } = parseUsername(input.username);
 	if (input.classification !== 'Student' && input.classification !== 'Employee') {
 		throw new AuthError('invalid_classification', 'Choose Student or Employee.');
 	}
@@ -104,7 +117,7 @@ export async function signUp(
 		return toUser(row);
 	} catch (err) {
 		// The unique index on username_normalized is the source of truth, including for races.
-		if (isUniqueViolation(err)) throw new AuthError('username_taken', 'That username is taken.');
+		if (isUniqueViolation(err)) throw new UsernameTakenError();
 		throw err;
 	}
 }
