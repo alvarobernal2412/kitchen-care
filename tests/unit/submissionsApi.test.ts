@@ -89,6 +89,16 @@ describe('POST /api/submissions', () => {
 		expect(await readdir(dir)).toHaveLength(1);
 	});
 
+	it('takes grounds as a reviewed photo, once a day (409 cooldown)', async () => {
+		const first = await call(await multipart('grounds'));
+		expect(first).toEqual({ status: 201, body: { ok: true, status: 'pending' } });
+		const again = await call(await multipart('grounds'));
+		expect(again.status).toBe(409);
+		expect(again.body.error).toBe('cooldown');
+		expect(again.body.retryAfterSeconds).toBeGreaterThan(86_000);
+		expect(await readdir(dir)).toHaveLength(1);
+	});
+
 	it('maps invalid images, wrong tasks and unknown tasks', async () => {
 		expect((await call(await multipart('beans', Buffer.from('hello')))).status).toBe(422);
 		expect((await call(await multipart('dishwasher'))).body.error).toBe('not_a_review_task');

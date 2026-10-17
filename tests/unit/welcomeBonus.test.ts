@@ -207,9 +207,9 @@ describe('signUp welcome bonus', () => {
 		await createPeriod(t.db, 'P');
 		const u = await join();
 		await logTask(t.db, u.id, 'dishwasher', { now: BEFORE });
-		await logTask(t.db, u.id, 'grounds', { now: BEFORE });
+		await logTask(t.db, u.id, 'cutlery', { now: BEFORE });
 		expect(await getLeaderboard(t.db, (await bonusRows(u.id))[0].periodId!)).toMatchObject([
-			{ userId: u.id, points: 15 }
+			{ userId: u.id, points: 13 }
 		]);
 	});
 });

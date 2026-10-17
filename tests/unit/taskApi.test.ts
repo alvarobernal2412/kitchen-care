@@ -50,7 +50,7 @@ describe('POST /api/tasks/[key]', () => {
 	});
 
 	it('refuses photo tasks without creating a submission', async () => {
-		for (const key of ['cutlery', 'beans']) {
+		for (const key of ['cutlery', 'beans', 'grounds']) {
 			const r = await post(key);
 			expect(r.status).toBe(422);
 			expect(r.body).toEqual({ error: 'photo_required' });

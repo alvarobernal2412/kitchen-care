@@ -25,6 +25,14 @@ describe('seedTasks', () => {
 		expect((await get('dishwasher')).cooldownSeconds).toBe(9000);
 		expect((await get('cutlery')).persistPhoto).toBe(false);
 		expect((await get('beans')).needsReview).toBe(true);
+		expect(await get('grounds')).toMatchObject({
+			points: 3,
+			cooldownSeconds: 86400,
+			requiresPhoto: true,
+			persistPhoto: true,
+			needsReview: true,
+			milestone: false
+		});
 		expect(await get('welcome_bonus')).toMatchObject({
 			label: 'Welcome bonus',
 			points: 10,

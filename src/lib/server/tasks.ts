@@ -1,4 +1,4 @@
-import { and, desc, eq, ne, sql } from 'drizzle-orm';
+import { and, desc, eq, notInArray, sql } from 'drizzle-orm';
 import type { Db } from './db';
 import { deleteUpload, processUpload } from './images';
 import { events, periods, submissions, tasks, users } from './db/schema';
@@ -41,6 +41,12 @@ export class InactiveUserError extends Error {
 		this.name = 'InactiveUserError';
 	}
 }
+
+/**
+ * Submissions in these states never start (or extend) a cooldown: a rejected photo was refused and
+ * a revoked chore was removed by an admin, so the person may log the chore again.
+ */
+const COOLDOWN_IGNORED: ('rejected' | 'revoked')[] = ['rejected', 'revoked'];
 
 export type LogOptions = { now?: Date; imagePath?: string };
 
@@ -91,7 +97,7 @@ export async function creditAutoApprovedTask(
 				and(
 					eq(submissions.userId, userId),
 					eq(submissions.taskKey, task.key),
-					ne(submissions.status, 'rejected')
+					notInArray(submissions.status, COOLDOWN_IGNORED)
 				)
 			)
 			.orderBy(desc(submissions.createdAt))
@@ -148,12 +154,43 @@ export async function getCooldownRemaining(
 			and(
 				eq(submissions.userId, userId),
 				eq(submissions.taskKey, task.key),
-				ne(submissions.status, 'rejected')
+				notInArray(submissions.status, COOLDOWN_IGNORED)
 			)
 		)
 		.orderBy(desc(submissions.createdAt))
 		.limit(1);
 	return last ? cooldownRemainingSeconds(last.createdAt, task.cooldownSeconds, now) : 0;
+}
+
+/**
+ * Cooldown of a task for Home: seconds left plus the status of the submission that causes it
+ * (pending for a photo task waiting for review, approved otherwise). Null status when free.
+ */
+export async function getCooldownState(
+	db: Db,
+	userId: number,
+	task: Task,
+	now: Date = new Date()
+): Promise<{ remainingSeconds: number; lastStatus: 'pending' | 'approved' | null }> {
+	if (task.cooldownSeconds <= 0) return { remainingSeconds: 0, lastStatus: null };
+	const [last] = await db
+		.select({ createdAt: submissions.createdAt, status: submissions.status })
+		.from(submissions)
+		.where(
+			and(
+				eq(submissions.userId, userId),
+				eq(submissions.taskKey, task.key),
+				notInArray(submissions.status, COOLDOWN_IGNORED)
+			)
+		)
+		.orderBy(desc(submissions.createdAt), desc(submissions.id))
+		.limit(1);
+	if (!last) return { remainingSeconds: 0, lastStatus: null };
+	const remainingSeconds = cooldownRemainingSeconds(last.createdAt, task.cooldownSeconds, now);
+	return {
+		remainingSeconds,
+		lastStatus: remainingSeconds > 0 && last.status === 'pending' ? 'pending' : remainingSeconds > 0 ? 'approved' : null
+	};
 }
 
 /** The user's approved points in a period. */
@@ -253,6 +290,27 @@ export async function submitPhotoTask(
 					)
 				);
 			if (count >= MAX_PENDING_PER_TASK) throw new TooManyPendingError();
+
+			// Review tasks with a cooldown (grounds: once a day) count pending and approved
+			// submissions alike; rejected and revoked ones do not.
+			if (task.cooldownSeconds > 0) {
+				const [last] = await tx
+					.select({ createdAt: submissions.createdAt })
+					.from(submissions)
+					.where(
+						and(
+							eq(submissions.userId, userId),
+							eq(submissions.taskKey, task.key),
+							notInArray(submissions.status, COOLDOWN_IGNORED)
+						)
+					)
+					.orderBy(desc(submissions.createdAt), desc(submissions.id))
+					.limit(1);
+				if (last) {
+					const remaining = cooldownRemainingSeconds(last.createdAt, task.cooldownSeconds, now);
+					if (remaining > 0) throw new CooldownError(remaining);
+				}
+			}
 
 			const [row] = await tx
 				.insert(submissions)

@@ -122,6 +122,65 @@ describe('submitPhotoTask', () => {
 	});
 });
 
+describe('submitPhotoTask cooldown (grounds, once a day)', () => {
+	const DAY = 86_400_000;
+	const at = (ms: number) => new Date(T0.getTime() + ms);
+	const cooldownOf = async (p: Promise<unknown>) => {
+		const err = await p.then(
+			() => null,
+			(e) => e
+		);
+		expect(err).toBeInstanceOf(CooldownError);
+		return (err as CooldownError).retryAfterSeconds;
+	};
+
+	it('blocks a second submission while one is pending, with the time left', async () => {
+		await submitPhotoTask(t.db, user, 'grounds', await img(), { uploadDir: dir, now: T0 });
+		const left = await cooldownOf(
+			submitPhotoTask(t.db, user, 'grounds', await img(), { uploadDir: dir, now: at(DAY - 90_000) })
+		);
+		expect(left).toBe(90);
+		expect(await files()).toHaveLength(1); // the refused photo was removed again
+	});
+
+	it('succeeds exactly at the end of the window', async () => {
+		await submitPhotoTask(t.db, user, 'grounds', await img(), { uploadDir: dir, now: T0 });
+		await submitPhotoTask(t.db, user, 'grounds', await img(), { uploadDir: dir, now: at(DAY) });
+	});
+
+	it('also counts an approved submission', async () => {
+		const s = await submitPhotoTask(t.db, user, 'grounds', await img(), { uploadDir: dir, now: T0 });
+		await approve(t.db, admin, s.id, { now: T0 });
+		await cooldownOf(
+			submitPhotoTask(t.db, user, 'grounds', await img(), { uploadDir: dir, now: at(DAY - 1000) })
+		);
+	});
+
+	it('ignores rejected submissions', async () => {
+		const s = await submitPhotoTask(t.db, user, 'grounds', await img(), { uploadDir: dir, now: T0 });
+		await reject(t.db, admin, s.id, 'blurry', { uploadDir: dir });
+		await submitPhotoTask(t.db, user, 'grounds', await img(), { uploadDir: dir, now: at(1000) });
+	});
+
+	it('is per user and does not touch beans or milk (cooldown 0)', async () => {
+		const other = await mkUser('someone-else');
+		await submitPhotoTask(t.db, user, 'grounds', await img(), { uploadDir: dir, now: T0 });
+		await submitPhotoTask(t.db, other, 'grounds', await img(), { uploadDir: dir, now: T0 });
+		await submitPhotoTask(t.db, user, 'beans', await img(), { uploadDir: dir, now: T0 });
+		await submitPhotoTask(t.db, user, 'beans', await img(), { uploadDir: dir, now: T0 });
+	});
+
+	it('lets only one of two simultaneous submissions through', async () => {
+		const a = await img();
+		const results = await Promise.allSettled([
+			submitPhotoTask(t.db, user, 'grounds', a, { uploadDir: dir, now: T0 }),
+			submitPhotoTask(t.db, user, 'grounds', a, { uploadDir: dir, now: T0 })
+		]);
+		expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+		expect(await files()).toHaveLength(1);
+	});
+});
+
 describe('listPending', () => {
 	it('carries what the review row shows: task points and the submitter avatar', async () => {
 		await t.db.update(users).set({ avatarPath: 'a'.repeat(32) + '.webp' }).where(eq(users.id, user));

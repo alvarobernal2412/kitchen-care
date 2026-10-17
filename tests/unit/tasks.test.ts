@@ -81,9 +81,9 @@ describe('logTask', () => {
 		expect(s.pointsAwarded).toBe(2);
 	});
 
-	it('blocks grounds twice within 23 h', async () => {
-		await logTask(t.db, u1, 'grounds', { now: T0 });
-		await cooldownOf(logTask(t.db, u1, 'grounds', { now: after(23 * HOUR) }));
+	it('blocks dishwasher twice within 2 h', async () => {
+		await logTask(t.db, u1, 'dishwasher', { now: T0 });
+		await cooldownOf(logTask(t.db, u1, 'dishwasher', { now: after(2 * HOUR) }));
 	});
 
 	it('throws NoActivePeriodError without an active period', async () => {
@@ -105,11 +105,12 @@ describe('logTask', () => {
 	it('does not block other users or other tasks', async () => {
 		await logTask(t.db, u1, 'dishwasher', { now: T0 });
 		await logTask(t.db, u2, 'dishwasher', { now: T0 });
-		await logTask(t.db, u1, 'grounds', { now: T0 });
+		await logTask(t.db, u1, 'cutlery', { now: T0 });
 		expect(await t.db.select().from(submissions)).toHaveLength(3);
 	});
 
 	it('rejects review tasks and unknown keys', async () => {
+		await expect(logTask(t.db, u1, 'grounds')).rejects.toBeInstanceOf(TaskRequiresReviewError);
 		await expect(logTask(t.db, u1, 'beans')).rejects.toBeInstanceOf(TaskRequiresReviewError);
 		await expect(logTask(t.db, u1, 'nope')).rejects.toBeInstanceOf(UnknownTaskError);
 	});

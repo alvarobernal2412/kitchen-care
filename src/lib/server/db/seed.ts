@@ -29,9 +29,9 @@ const TASKS: (typeof tasks.$inferInsert)[] = [
 		label: 'Take coffee grounds to 2nd basement',
 		points: 3,
 		cooldownSeconds: 86400,
-		requiresPhoto: false,
-		persistPhoto: false,
-		needsReview: false,
+		requiresPhoto: true,
+		persistPhoto: true,
+		needsReview: true,
 		milestone: false
 	},
 	{
