@@ -39,6 +39,18 @@ unit-test databases. Uploads go to a temp directory. Tests use unique usernames,
 no cleanup. Locally an already-running server on that port is reused; set `CI=1` to always
 start a fresh one.
 
+## Design system
+
+- Tokens (colour, type, spacing, radii, motion; light and dark): `src/lib/styles/tokens.css`.
+  Reset and typography: `base.css`. Shared classes (`.btn`, `.chip`, `.tile`, `.rows`, ...):
+  `components.css`. Components use tokens only: no hard-coded colours, mobile-first, no
+  `max-width` media queries. Reference mockups and notes: `docs/design/mockups/`.
+- Accessibility and layout checks (axe on every key page, light and dark, phone and laptop;
+  no horizontal scroll; keyboard order; reduced motion; focus rings): `npx playwright test a11y.spec.ts`.
+- Screenshots of every screen (390 and 1280 px, light and dark) from seeded data:
+  `node scripts/screenshots.mjs [output-dir]` (default `tmp/screenshots`, git-ignored). It
+  uses the same dedicated e2e database as the e2e suite.
+
 ## Install as an app (PWA)
 
 The service worker and manifest are active in production builds. On Android Chrome use
