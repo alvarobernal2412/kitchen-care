@@ -201,8 +201,12 @@
 		display: grid;
 		gap: var(--sp-3);
 	}
-	.u.inactive .head {
-		opacity: 0.8;
+	/* Deactivated: greyed avatar and a muted name; text is never faded (it must keep its contrast). */
+	.u.inactive .head :global(.avatar) {
+		filter: grayscale(1);
+	}
+	.u.inactive .name b {
+		color: var(--muted);
 	}
 	.head {
 		display: grid;
