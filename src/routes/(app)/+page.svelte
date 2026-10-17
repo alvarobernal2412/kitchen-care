@@ -6,6 +6,7 @@
 	import ChoreTile, { type ChoreTask, type TileState } from '$lib/components/ChoreTile.svelte';
 	import CreditHeader from '$lib/components/CreditHeader.svelte';
 	import RecentActivity from '$lib/components/RecentActivity.svelte';
+	import InstallPrompt from '$lib/components/InstallPrompt.svelte';
 
 	let { data } = $props();
 
@@ -336,6 +337,7 @@
 	/>
 
 	<div class="layout">
+		{#if !capture}<InstallPrompt />{/if}
 		<section aria-labelledby="log">
 			<h2 class="sec" id="log">Log a chore</h2>
 			<p

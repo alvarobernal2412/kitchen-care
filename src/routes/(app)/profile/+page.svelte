@@ -2,14 +2,20 @@
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { onDestroy } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 	import Avatar from '$lib/components/Avatar.svelte';
 	import PasswordMeter from '$lib/components/PasswordMeter.svelte';
+	import InstallSteps from '$lib/components/InstallSteps.svelte';
+	import { install } from '$lib/client/install.svelte';
+	import { installInstructions } from '$lib/client/installHelp';
 	import { IconCaretRight } from '$lib/icons';
 	import { avatarUrl } from '$lib/avatar';
 	import { prepareAvatar } from '$lib/client/avatar';
 
 	let { data, form } = $props();
+
+	onMount(() => install.start());
+	const installHelp = $derived(install.ready ? installInstructions(install.env) : null);
 
 	const current = $derived(avatarUrl(data.profile.avatarPath));
 
@@ -298,6 +304,20 @@
 		</form>
 	</section>
 
+	{#if install.ready}
+		<section aria-labelledby="install-h">
+			<h2 id="install-h">Install the app</h2>
+			{#if install.env === 'installed'}
+				<p class="note">The app is installed on this device.</p>
+			{:else if installHelp}
+				<p class="lead">{installHelp.title}</p>
+				<InstallSteps help={installHelp} />
+			{:else}
+				<p class="note">Open this page in Safari on iPhone or Chrome on Android to install it.</p>
+			{/if}
+		</section>
+	{/if}
+
 	{#if data.user.role === 'admin'}
 		<section class="admin">
 			<a class="link-row" href={resolve('/admin/review')}>
@@ -372,6 +392,10 @@
 	.cluster .btn,
 	.stack > .btn {
 		width: auto;
+	}
+	.lead {
+		margin: 0 0 var(--sp-3);
+		font-weight: 600;
 	}
 	.note {
 		margin: 0;
