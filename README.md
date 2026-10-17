@@ -16,6 +16,52 @@ npm run db:push                   # create the schema in the dev database
 npm run dev
 ```
 
+## Try it locally
+
+Needs Node 24 and Docker. The demo data is for local development only: the seed refuses to run
+unless `DATABASE_URL` points at localhost, 127.0.0.1 or ::1 and `NODE_ENV` is not `production`.
+
+```sh
+docker compose -f compose.dev.yml up -d   # Postgres on localhost:5432
+cp .env.example .env                      # set SESSION_SECRET to any long random string; the rest works as is
+npm ci
+npm run dev:seed                          # applies the migrations, then adds the demo data
+npm run dev                               # http://localhost:5173
+```
+
+Sign in as `admin` / `Admin-Dev-2026!` or as the member `demo` / `Kitchen-Dev-2026!` (47 points,
+rank 3). The other members (`lena`, `mateo`, `priya`, `jonas`, ...) share the member password.
+`npm run dev:seed` twice changes nothing; `npm run dev:seed -- --reset` empties the app tables of
+that local database, removes the uploads it wrote and creates the demo data again.
+
+Things to try:
+
+1. Log a chore (dishwasher, grounds) and watch the credit count-up.
+2. See the cooldown fill on the chore tiles (as `demo`, three are partly through their cooldown).
+3. Submit a photo task (beans, milk) with the camera or a file.
+4. Run the cutlery check.
+5. As admin, approve the descaling in Review and find the milestone post in the feed.
+6. Use the leaderboard filters (Students, Employees, department); first place is a tie.
+7. Collapse the sidebar at laptop width.
+8. Install the app as a PWA (production build: `npm run build && npm run preview`).
+9. Switch your OS to dark mode.
+10. Tick "Offline" in the browser DevTools network tab and reload to see the offline page.
+
+### On a phone
+
+The camera needs a secure context, so `http://<LAN-IP>:5173` will not offer it on a phone, and
+`npm run build && npm run preview -- --host` over the LAN is plain http too. Use an https tunnel
+to the dev server instead (Cloudflare quick tunnel; the dev server already accepts
+`*.trycloudflare.com` hosts):
+
+```sh
+npm run dev
+cloudflared tunnel --url http://localhost:5173   # prints https://<random>.trycloudflare.com
+```
+
+Open that URL on the phone. No `ORIGIN` setting is needed in dev: the API's same-origin check
+trusts `X-Forwarded-Proto` there (the tunnel sends it), and SvelteKit's own check is off in dev.
+
 ## Tests
 
 ```sh
