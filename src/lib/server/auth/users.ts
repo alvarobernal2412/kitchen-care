@@ -2,6 +2,7 @@ import { DEPARTMENTS, users } from '../db/schema';
 import type { Db } from '../db';
 import { hashPassword } from './hash';
 import { validatePassword } from './password';
+import { grantWelcomeBonus, isWelcomeBonusOpen } from '../welcomeBonus';
 
 /** A user row without the password hash; safe to put in `locals` and pass around. */
 export type User = Omit<typeof users.$inferSelect, 'passwordHash'>;
@@ -54,7 +55,16 @@ function isUniqueViolation(err: unknown): boolean {
 	return false;
 }
 
-export async function signUp(db: Db, input: SignUpInput): Promise<User> {
+/**
+ * Creates an account. Before the welcome-bonus deadline (see welcomeBonus.ts) the new user also
+ * gets the one-time bonus when a period is active, in the same transaction as the user row.
+ */
+export async function signUp(
+	db: Db,
+	input: SignUpInput,
+	opts: { now?: Date } = {}
+): Promise<User> {
+	const now = opts.now ?? new Date();
 	const display = input.username.trim();
 	const normalized = normalizeUsername(input.username);
 	if (normalized.length < USERNAME_MIN || normalized.length > USERNAME_MAX || !USERNAME_RE.test(normalized)) {
@@ -77,16 +87,20 @@ export async function signUp(db: Db, input: SignUpInput): Promise<User> {
 
 	const passwordHash = await hashPassword(input.password);
 	try {
-		const [row] = await db
-			.insert(users)
-			.values({
-				usernameNormalized: normalized,
-				displayUsername: display,
-				passwordHash,
-				classification: input.classification,
-				department
-			})
-			.returning();
+		const row = await db.transaction(async (tx) => {
+			const [created] = await tx
+				.insert(users)
+				.values({
+					usernameNormalized: normalized,
+					displayUsername: display,
+					passwordHash,
+					classification: input.classification,
+					department
+				})
+				.returning();
+			if (isWelcomeBonusOpen(now)) await grantWelcomeBonus(tx, created.id, now);
+			return created;
+		});
 		return toUser(row);
 	} catch (err) {
 		// The unique index on username_normalized is the source of truth, including for races.
