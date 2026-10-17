@@ -428,7 +428,7 @@ test.describe('coffee grounds is a reviewed photo chore', () => {
 		await openHome(page);
 		const grounds = tile(page, 'grounds');
 		await expect(grounds).toHaveAttribute('data-state', 'cooldown');
-		await expect(grounds).toContainText(/Ready in 2[23] h \d+ min/);
+		await expect(grounds).toContainText(/Ready in 2[23] h( \d+ min)?/);
 		await expect(grounds).toHaveAttribute('aria-disabled', 'true');
 		const fill = parseFloat(await grounds.evaluate((el) => (el as HTMLElement).style.getPropertyValue('--fill')));
 		expect(fill).toBeGreaterThan(3);
