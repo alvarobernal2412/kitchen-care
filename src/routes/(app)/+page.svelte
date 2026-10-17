@@ -39,8 +39,7 @@
 			};
 			const at = availableAt(t.key);
 			let state: TileState;
-			if (!data.period) state = 'unavailable';
-			else if (at > now) state = 'cooldown';
+			if (at > now) state = 'cooldown';
 			else if (t.needsReview && t.pendingCount > 0) state = 'pending';
 			else if (t.needsReview) state = 'photo';
 			else state = 'ready';

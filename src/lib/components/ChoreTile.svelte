@@ -6,7 +6,7 @@
 		needsPhoto: boolean;
 		needsReview: boolean;
 	};
-	export type TileState = 'ready' | 'cooldown' | 'photo' | 'pending' | 'unavailable';
+	export type TileState = 'ready' | 'cooldown' | 'photo' | 'pending';
 
 	/** "Ready in 45 s", "Ready in 58 min", "Ready in 2 h 14 min" (visible, second precision under a minute). */
 	export function readyInText(seconds: number): string {
@@ -89,7 +89,7 @@
 	const fill = $derived(
 		tileState === 'cooldown' ? Math.round(elapsedShare(availableAt - now, cooldownSeconds) * 1000) / 10 : 0
 	);
-	const inert = $derived(tileState === 'cooldown' || tileState === 'unavailable' || disabled);
+	const inert = $derived(tileState === 'cooldown' || disabled);
 	const showCamera = $derived(tileState === 'photo');
 
 	const name = $derived.by(() => {
