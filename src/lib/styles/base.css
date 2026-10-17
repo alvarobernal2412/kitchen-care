@@ -43,6 +43,10 @@ body {
 	-webkit-font-smoothing: antialiased;
 	-moz-osx-font-smoothing: grayscale;
 	overflow-x: hidden;
+	/* viewport-fit=cover (app.html) lets the page reach under notches and the home indicator; keep
+	   the content inside the safe area. Fixed bars handle their own insets. */
+	padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) 0
+		env(safe-area-inset-left, 0px);
 }
 
 /* The app root created by SvelteKit's wrapper div (display: contents) children fill the screen. */

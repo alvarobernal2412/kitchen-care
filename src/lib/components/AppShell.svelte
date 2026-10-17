@@ -169,7 +169,8 @@
 		z-index: var(--z-bar);
 		display: flex;
 		height: calc(var(--bar-h) + env(safe-area-inset-bottom, 0px));
-		padding-bottom: env(safe-area-inset-bottom, 0px);
+		padding: 0 env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px)
+			env(safe-area-inset-left, 0px);
 		background: var(--surface);
 		border-top: 1px solid var(--line);
 		box-shadow: var(--shadow-bar);
@@ -257,7 +258,7 @@
 		}
 		.sidebar {
 			position: fixed;
-			inset: 0 auto 0 0;
+			inset: 0 auto 0 env(safe-area-inset-left, 0px);
 			z-index: var(--z-bar);
 			display: flex;
 			flex-direction: column;
