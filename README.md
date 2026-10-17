@@ -34,6 +34,9 @@ and each has "Remove points" with a required reason and a confirmation. The chor
 nowhere, its owner sees "Removed by admin: <reason>" and can log it again; a milestone's feed post
 is deleted. Periods that have ended are final and cannot be changed.
 
+Every feed post needs a title (1-80 characters) as well as its text. People can change their username on
+the Profile page (current password required; the old name becomes free for others).
+
 ## Try it locally
 
 Needs Node 24 and Docker. The demo data is for local development only: the seed refuses to run
