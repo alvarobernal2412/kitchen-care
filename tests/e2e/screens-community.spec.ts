@@ -571,10 +571,10 @@ test.describe('feed', () => {
 		const mine = post.getByRole('listitem').filter({ hasText: 'My own reply' });
 		await mine.getByRole('button', { name: 'Delete' }).click();
 		await expect(mine).toContainText('Delete?');
-		await mine.getByRole('button', { name: 'No' }).click();
+		await mine.getByRole('button', { name: 'No', exact: true }).click();
 		await expect(post.getByText('My own reply')).toBeVisible();
 		await mine.getByRole('button', { name: 'Delete' }).click();
-		await mine.getByRole('button', { name: 'Yes' }).click();
+		await mine.getByRole('button', { name: 'Yes', exact: true }).click();
 		await expect(post.getByText('My own reply')).toHaveCount(0);
 		await expect(post.getByRole('button', { name: /1 comment/ })).toBeVisible();
 		// Not yours: no delete control.
@@ -594,10 +594,10 @@ test.describe('feed', () => {
 		const post = article(page, 'Post to be removed');
 		await post.getByRole('button', { name: 'Delete post' }).click();
 		await expect(post).toContainText('Delete?');
-		await post.getByRole('button', { name: 'No' }).click();
+		await post.getByRole('button', { name: 'No', exact: true }).click();
 		await expect(post).toBeVisible();
 		await post.getByRole('button', { name: 'Delete post' }).click();
-		await post.getByRole('button', { name: 'Yes' }).click();
+		await post.getByRole('button', { name: 'Yes', exact: true }).click();
 		await expect(article(page, 'Post to be removed')).toHaveCount(0);
 	});
 
