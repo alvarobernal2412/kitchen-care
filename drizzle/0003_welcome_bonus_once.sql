@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "submissions_welcome_bonus_once_idx" ON "submissions" USING btree ("user_id") WHERE "submissions"."task_key" = 'welcome_bonus';

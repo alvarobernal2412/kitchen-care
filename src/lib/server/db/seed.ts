@@ -1,6 +1,7 @@
 import { hashPassword } from '../auth/hash';
 import type { Db } from './index';
 import { tasks, users } from './schema';
+import { WELCOME_BONUS_KEY, WELCOME_BONUS_POINTS } from '../welcomeBonus';
 
 const TASKS: (typeof tasks.$inferInsert)[] = [
 	{
@@ -72,6 +73,18 @@ const TASKS: (typeof tasks.$inferInsert)[] = [
 		persistPhoto: true,
 		needsReview: true,
 		milestone: true
+	},
+	// Not a chore: the ledger entry behind the one-time welcome bonus (see welcomeBonus.ts). It is
+	// excluded from every list of chores, and the task APIs refuse it.
+	{
+		key: WELCOME_BONUS_KEY,
+		label: 'Welcome bonus',
+		points: WELCOME_BONUS_POINTS,
+		cooldownSeconds: 0,
+		requiresPhoto: false,
+		persistPhoto: false,
+		needsReview: false,
+		milestone: false
 	}
 ];
 

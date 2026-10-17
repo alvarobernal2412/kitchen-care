@@ -137,7 +137,11 @@ export const submissions = pgTable(
 	},
 	(t) => [
 		index('submissions_user_task_idx').on(t.userId, t.taskKey, t.createdAt),
-		index('submissions_period_status_idx').on(t.periodId, t.status)
+		index('submissions_period_status_idx').on(t.periodId, t.status),
+		// The one-time welcome bonus: at most one such row per user, whatever else happens.
+		uniqueIndex('submissions_welcome_bonus_once_idx')
+			.on(t.userId)
+			.where(sql`${t.taskKey} = 'welcome_bonus'`)
 	]
 );
 
