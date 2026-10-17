@@ -32,7 +32,7 @@ type Member = {
 	department?: string;
 	/** Total points in the active period. */
 	target: number;
-	/** Self-reported logs as [task, hours ago], oldest first and spaced beyond the cooldown. */
+	/** Dishwasher and cutlery logs, and approved grounds photos, as [task, hours ago]; oldest first and spaced beyond the cooldown. */
 	autos: [string, number][];
 };
 
@@ -199,6 +199,8 @@ async function seed(db: Db): Promise<void> {
 		// Self-reported chores, back-dated (oldest first, so the cooldown check sees them in order).
 		for (const [task, hours] of m.autos) {
 			if (task === 'cutlery') await submitCutleryTask(db, userId, true, { now: ago(hours) });
+			// Coffee grounds is a reviewed photo chore: submitted, then approved half an hour later.
+			else if (task === 'grounds') await earn(userId, task, ago(hours));
 			else await logTask(db, userId, task, { now: ago(hours) });
 		}
 		let remaining = m.target - m.autos.reduce((sum, [task]) => sum + AUTO_POINTS[task], 0);
@@ -220,6 +222,7 @@ async function seed(db: Db): Promise<void> {
 	await submitPhotoTask(db, idOf('priya'), 'beans', photo(), { now: ago(0.25) });
 	await submitPhotoTask(db, idOf('jonas'), 'milk', photo(), { now: ago(0.8) });
 	await submitPhotoTask(db, idOf('noah'), 'descale', photo(), { now: ago(1.5) });
+	await submitPhotoTask(db, idOf('amara'), 'grounds', photo(), { now: ago(0.5) });
 
 	// Text posts with reactions and comments.
 	const textPosts: [string, string, number][] = [
