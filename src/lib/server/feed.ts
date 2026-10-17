@@ -120,6 +120,11 @@ export async function createMilestonePost(db: Executor, submission: Submission):
 	});
 }
 
+/** Removes the milestone post of a submission (comments and reactions cascade); no-op if none. */
+export async function deleteMilestonePost(db: Executor, submissionId: number): Promise<void> {
+	await db.delete(posts).where(eq(posts.milestoneSubmissionId, submissionId));
+}
+
 /** Adapter with the argument order `approve({ onMilestone })` uses. */
 export const onMilestonePost = (submission: Submission, tx: Executor) =>
 	createMilestonePost(tx, submission);
