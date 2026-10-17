@@ -1,6 +1,11 @@
 <script lang="ts">
-	import { barHeight, formatCount, niceMax } from '$lib/charts';
+	import { formatCount, niceMax } from '$lib/charts';
 
+	/**
+	 * Grouped vertical bars drawn with plain boxes. `s0` is the lighter, hatched series and `s1` the
+	 * solid one, so the two differ by pattern and tone and never by hue alone. The plot is one image
+	 * for assistive tech (`summary`); "Show as table" lists every value.
+	 */
 	type Series = { name: string; cls: 's0' | 's1' };
 	type Point = { label: string; values: number[] };
 	let {
@@ -9,19 +14,15 @@
 		summary
 	}: { points: Point[]; series: Series[]; summary: string } = $props();
 
-	const H = 120;
-	const BAR = 8;
-	const GAP = 4;
-	const group = $derived(series.length * BAR + GAP);
-	const width = $derived(points.length * group);
 	const axisMax = $derived(niceMax(Math.max(0, ...points.flatMap((p) => p.values))));
 	const empty = $derived(points.every((p) => p.values.every((v) => v === 0)));
-	// Keeps ~1 bar group per 14px on narrow screens; the container scrolls sideways.
+	// About 14px per bar group, so a long range scrolls inside the chart instead of squeezing the bars.
 	const minPx = $derived(Math.max(280, points.length * (series.length * 7 + 3)));
+	const pct = (v: number) => (v > 0 ? `max(2px, ${(Math.min(v, axisMax) / axisMax) * 100}%)` : '0');
 </script>
 
 {#if empty}
-	<p class="empty">No activity in this range</p>
+	<p class="empty">No activity in this range.</p>
 {:else}
 	<ul class="legend" aria-label="Legend">
 		{#each series as s (s.name)}
@@ -29,36 +30,25 @@
 		{/each}
 	</ul>
 	<div class="scroll">
-		<div class="plot">
-			<span class="axis-max">{formatCount(axisMax)}</span>
-			<svg
-				viewBox="0 0 {width} {H}"
-				style="min-width: {minPx}px"
-				role="img"
-				aria-label={summary}
-				preserveAspectRatio="none"
-			>
-				<line x1="0" x2={width} y1={H - 0.5} y2={H - 0.5} class="base" />
-				<line x1="0" x2={width} y1="0.5" y2="0.5" class="grid" />
-				{#each points as p, i (p.label)}
-					{#each p.values as v, j (j)}
-						{@const h = barHeight(v, axisMax, H)}
-						<rect
-							class={series[j].cls}
-							x={i * group + j * BAR + GAP / 2}
-							y={H - h}
-							width={BAR - 1}
-							height={h}
-						>
-							<title>{p.label}, {series[j].name}: {formatCount(v)}</title>
-						</rect>
-					{/each}
+		<div class="frame" style="min-width: {minPx}px">
+			<span class="axis-max num" aria-hidden="true">{formatCount(axisMax)}</span>
+			<div class="plot" role="img" aria-label={summary}>
+				{#each points as p (p.label)}
+					<div class="group">
+						{#each p.values as v, j (j)}
+							<span
+								class="bar {series[j].cls}"
+								style:height={pct(v)}
+								title="{p.label}, {series[j].name}: {formatCount(v)}"
+							></span>
+						{/each}
+					</div>
 				{/each}
-			</svg>
-		</div>
-		<div class="x-labels" aria-hidden="true">
-			<span>{points[0].label}</span>
-			<span>{points[points.length - 1].label}</span>
+			</div>
+			<div class="x-labels" aria-hidden="true">
+				<span>{points[0].label}</span>
+				<span>{points[points.length - 1].label}</span>
+			</div>
 		</div>
 	</div>
 	<details>
@@ -86,83 +76,104 @@
 
 <style>
 	.empty {
-		margin: 1rem 0;
-		color: #4b5563;
+		color: var(--muted);
 	}
 	.scroll {
 		overflow-x: auto;
 	}
-	.plot {
+	.frame {
 		position: relative;
-		padding-left: 2.2rem;
+		padding-top: var(--sp-5);
 	}
 	.axis-max {
 		position: absolute;
+		top: 0;
 		left: 0;
-		top: -0.4rem;
-		font-size: 0.75rem;
-		color: #4b5563;
+		color: var(--muted);
+		font-size: var(--fs-small);
+		line-height: 1;
 	}
-	svg {
-		display: block;
-		width: 100%;
-		height: 7.5rem;
+	.plot {
+		display: flex;
+		align-items: flex-end;
+		gap: 3px;
+		height: 140px;
+		border-bottom: 1px solid var(--muted);
+		/* the dashed line marks the axis maximum */
+		background: linear-gradient(to right, var(--line) 50%, transparent 0) top / 8px 1px repeat-x;
 	}
-	.base {
-		stroke: #6b7280;
-		stroke-width: 1;
-		vector-effect: non-scaling-stroke;
+	.group {
+		display: flex;
+		flex: 1;
+		align-items: flex-end;
+		gap: 1px;
+		height: 100%;
+		min-width: 0;
 	}
-	.grid {
-		stroke: #d1d5db;
-		stroke-width: 1;
-		stroke-dasharray: 3 3;
-		vector-effect: non-scaling-stroke;
+	.bar {
+		flex: 1;
+		min-width: 0;
+		border-radius: 2px 2px 0 0;
 	}
 	.s0 {
-		fill: #93c5fd;
-		background: #93c5fd;
+		background-color: var(--chart-1);
+		background-image: repeating-linear-gradient(
+			135deg,
+			transparent 0 2px,
+			var(--ground) 2px 3.5px
+		);
 	}
 	.s1 {
-		fill: #1e3a8a;
-		background: #1e3a8a;
+		background-color: var(--chart-2);
 	}
 	.x-labels {
 		display: flex;
 		justify-content: space-between;
-		padding-left: 2.2rem;
-		font-size: 0.75rem;
-		color: #4b5563;
+		margin-top: var(--sp-1);
+		color: var(--muted);
+		font-size: var(--fs-small);
 	}
 	.legend {
 		display: flex;
-		gap: 1rem;
-		margin: 0 0 0.5rem;
+		flex-wrap: wrap;
+		gap: var(--sp-1) var(--sp-4);
+		margin: 0 0 var(--sp-3);
 		padding: 0;
 		list-style: none;
-		font-size: 0.85rem;
+		font-size: var(--fs-ui);
+	}
+	.legend li {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--sp-2);
 	}
 	.swatch {
 		display: inline-block;
-		width: 0.8rem;
-		height: 0.8rem;
-		margin-right: 0.3rem;
-		border: 1px solid #1e3a8a;
-		vertical-align: middle;
+		width: 16px;
+		height: 16px;
+		border-radius: 3px;
 	}
 	details {
-		margin-top: 0.5rem;
-		font-size: 0.85rem;
+		margin-top: var(--sp-3);
+		font-size: var(--fs-ui);
+	}
+	summary {
+		display: flex;
+		align-items: center;
+		min-height: 44px;
+		color: var(--accent-ink);
+		font-weight: 600;
+		cursor: pointer;
 	}
 	table {
 		border-collapse: collapse;
-		margin-top: 0.5rem;
+		font-size: var(--fs-small);
 	}
 	th,
 	td {
-		padding: 0.2rem 0.6rem;
+		padding: 6px var(--sp-3);
 		text-align: right;
-		border-bottom: 1px solid #e5e7eb;
+		border-bottom: 1px solid var(--line);
 	}
 	th[scope='row'],
 	th:first-child {

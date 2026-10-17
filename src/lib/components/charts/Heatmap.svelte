@@ -11,18 +11,18 @@
 </script>
 
 {#if empty}
-	<p class="empty">No activity in this range</p>
+	<p class="empty">No activity in this range.</p>
 {:else}
-	<p class="legend" aria-hidden="true">
-		<span>0</span>
-		{#each steps as s (s)}<span class="swatch step{s}"></span>{/each}
-		<span>{formatCount(max)} (max)</span>
+	<p class="legend">
+		<span class="num">0</span>
+		{#each steps as s (s)}<span class="swatch step{s}" aria-hidden="true"></span>{/each}
+		<span class="num">{formatCount(max)} (max)</span>
 	</p>
 	<!-- Focusable so keyboard users can scroll the wide table sideways. -->
 	<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 	<div class="scroll" role="region" aria-label="Submissions heatmap" tabindex="0">
 		<table>
-			<caption class="sr">Task submissions by weekday and hour of day</caption>
+			<caption class="visually-hidden">Task submissions by weekday and hour of day</caption>
 			<thead>
 				<tr>
 					<td></td>
@@ -49,75 +49,68 @@
 
 <style>
 	.empty {
-		margin: 1rem 0;
-		color: #4b5563;
+		color: var(--muted);
 	}
 	.scroll {
 		overflow-x: auto;
+		border-radius: var(--r-ctl);
 	}
 	table {
 		min-width: 34rem;
 		width: 100%;
 		border-collapse: separate;
 		border-spacing: 2px;
-		font-size: 0.7rem;
+		font-size: 12px;
 		table-layout: fixed;
 	}
 	th {
+		color: var(--muted);
 		font-weight: 600;
-		color: #374151;
 	}
 	th[scope='row'] {
-		width: 2.4rem;
+		width: 2.6rem;
 		text-align: left;
 	}
 	td {
-		height: 1.6rem;
+		height: 28px;
 		padding: 0;
 		text-align: center;
-		border-radius: 3px;
-	}
-	.sr {
-		position: absolute;
-		width: 1px;
-		height: 1px;
-		overflow: hidden;
-		clip-path: inset(50%);
-		white-space: nowrap;
+		border-radius: 4px;
 	}
 	.legend {
 		display: flex;
 		align-items: center;
-		gap: 0.3rem;
-		margin: 0 0 0.5rem;
-		font-size: 0.8rem;
-		color: #374151;
+		gap: var(--sp-2);
+		margin: 0 0 var(--sp-3);
+		max-width: none;
+		color: var(--muted);
+		font-size: var(--fs-small);
 	}
 	.swatch {
 		display: inline-block;
-		width: 1.4rem;
-		height: 0.9rem;
-		border-radius: 3px;
+		width: 24px;
+		height: 16px;
+		border-radius: 4px;
 	}
-	/* single-hue scale; text flips to white from step 3 for contrast */
+	/* One teal hue, light to dark (dark to light in dark mode); step 0 is the empty cell. */
 	.step0 {
-		background: #f3f4f6;
-		color: #111827;
+		background: var(--recess);
+		color: var(--ink);
 	}
 	.step1 {
-		background: #bfdbfe;
-		color: #111827;
+		background: var(--heat-1);
+		color: var(--ink);
 	}
 	.step2 {
-		background: #60a5fa;
-		color: #111827;
+		background: var(--heat-2);
+		color: var(--ink);
 	}
 	.step3 {
-		background: #1d4ed8;
-		color: #ffffff;
+		background: var(--heat-3);
+		color: var(--on-accent);
 	}
 	.step4 {
-		background: #1e3a8a;
-		color: #ffffff;
+		background: var(--heat-4);
+		color: var(--on-accent);
 	}
 </style>
