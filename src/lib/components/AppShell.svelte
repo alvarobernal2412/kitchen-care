@@ -28,6 +28,15 @@
 	// Follows the server value, but the toggle may override it at once (optimistic).
 	let navState = $derived(nav);
 
+	// Browsers only scroll a focused link into view when it is mostly hidden, so a half-visible one
+	// keeps its focus ring cut off by the scroller. Pull it in, clear of the edge (scroll-padding).
+	function clearFocusRing(node: HTMLElement) {
+		const onFocusIn = (e: FocusEvent) =>
+			(e.target as HTMLElement).scrollIntoView({ inline: 'nearest', block: 'nearest' });
+		node.addEventListener('focusin', onFocusIn);
+		return { destroy: () => node.removeEventListener('focusin', onFocusIn) };
+	}
+
 	const bottomItems = NAV_ITEMS.filter((i) => i.bottomBar);
 	const onAdminPage = $derived(isAdmin && (pathname === '/admin' || pathname.startsWith('/admin/')));
 	const badgeFor = (item: NavItem) => (item.id === 'admin-review' ? pendingCount : 0);
@@ -112,7 +121,7 @@
 
 	<div class="content">
 		{#if onAdminPage}
-			<nav class="sections" aria-label="Admin sections">
+			<nav class="sections" aria-label="Admin sections" use:clearFocusRing>
 				{#each ADMIN_NAV_ITEMS as item (item.id)}
 					{@const active = isActive(item, pathname)}
 					<a
@@ -213,7 +222,7 @@
 		overflow-x: auto;
 		scroll-snap-type: x proximity;
 		/* a focused tab scrolls into view clear of the edge, so its focus ring is not clipped */
-		scroll-padding-inline: var(--gutter);
+		scroll-padding-inline: calc(var(--gutter) + 4px);
 		background: var(--surface);
 		border-bottom: 1px solid var(--line);
 		scrollbar-width: none;
