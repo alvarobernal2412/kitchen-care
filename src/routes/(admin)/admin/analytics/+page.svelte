@@ -35,6 +35,7 @@
 			? data.periodId
 			: null
 	);
+	// Segmented resolves each href against the base path itself, so these stay unprefixed.
 	function href(range: string, bucket: string): string {
 		const q = new SvelteURLSearchParams({ range, bucket });
 		if (explicitPeriod !== null) q.set('periodId', String(explicitPeriod));
@@ -198,7 +199,8 @@
 	}
 	dd {
 		margin: 2px 0 0;
-		font-size: 32px;
+		font-size: clamp(24px, 7vw, 32px);
+		overflow-wrap: anywhere;
 		font-weight: 800;
 		line-height: 1;
 		letter-spacing: -0.03em;
