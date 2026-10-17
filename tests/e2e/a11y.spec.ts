@@ -37,7 +37,8 @@ const TARGETS: Target[] = [
 	{ name: 'admin moderation', path: '/admin/moderation', role: 'admin' },
 	{ name: 'admin images', path: '/admin/images', role: 'admin' },
 	{ name: 'admin periods', path: '/admin/periods', role: 'admin' },
-	{ name: 'admin analytics', path: '/admin/analytics', role: 'admin' }
+	{ name: 'admin analytics', path: '/admin/analytics', role: 'admin' },
+	{ name: 'admin system', path: '/admin/system', role: 'admin' }
 ];
 
 const SCHEMES = ['light', 'dark'] as const;
