@@ -2,6 +2,7 @@ import { and, desc, eq, ne, sql } from 'drizzle-orm';
 import type { Db } from './db';
 import { deleteUpload, processUpload } from './images';
 import { events, periods, submissions, tasks, users } from './db/schema';
+import { WELCOME_BONUS_KEY } from './welcomeBonus';
 
 export type Submission = typeof submissions.$inferSelect;
 export type Task = typeof tasks.$inferSelect;
@@ -124,6 +125,8 @@ export async function logTask(
 	taskKey: string,
 	opts: LogOptions = {}
 ): Promise<Submission> {
+	// The welcome bonus is not loggable: it is only ever granted at signup.
+	if (taskKey === WELCOME_BONUS_KEY) throw new UnknownTaskError(taskKey);
 	const [task] = await db.select().from(tasks).where(eq(tasks.key, taskKey));
 	if (!task) throw new UnknownTaskError(taskKey);
 	if (task.needsReview) throw new TaskRequiresReviewError(taskKey);
@@ -205,6 +208,7 @@ export async function submitPhotoTask(
 	opts: PhotoOptions = {}
 ): Promise<Submission> {
 	const now = opts.now ?? new Date();
+	if (taskKey === WELCOME_BONUS_KEY) throw new UnknownTaskError(taskKey);
 	const [task] = await db.select().from(tasks).where(eq(tasks.key, taskKey));
 	if (!task) throw new UnknownTaskError(taskKey);
 	if (!task.needsReview) throw new NotAReviewTaskError(taskKey);

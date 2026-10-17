@@ -1,7 +1,8 @@
-import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, ne, sql } from 'drizzle-orm';
 import type { Db } from './db';
 import { submissions, tasks } from './db/schema';
 import { getLeaderboard } from './leaderboard';
+import { WELCOME_BONUS_KEY } from './welcomeBonus';
 
 export class InvalidRangeError extends Error {
 	constructor(message = 'Invalid range') {
@@ -158,7 +159,10 @@ export async function getHeatmap(
 export const DEFAULT_CONTRIBUTORS = 10;
 export const MAX_CONTRIBUTORS = 50;
 
-/** Top earners of a period, reusing the leaderboard ranking (approved, active users only). */
+/**
+ * Top earners of a period, reusing the leaderboard ranking (approved, active users only).
+ * `tasks` counts chores: the welcome bonus adds points but is not a task.
+ */
 export async function getTopContributors(
 	db: Pick<Db, 'select'>,
 	periodId: number,
@@ -178,6 +182,7 @@ export async function getTopContributors(
 			and(
 				eq(submissions.periodId, periodId),
 				eq(submissions.status, 'approved'),
+				ne(submissions.taskKey, WELCOME_BONUS_KEY),
 				inArray(
 					submissions.userId,
 					top.map((r) => r.userId)
@@ -194,7 +199,7 @@ export async function getTopContributors(
 	}));
 }
 
-/** Approved submissions per task in a period; every task is listed, zeros included. */
+/** Approved submissions per chore in a period; every chore is listed, zeros included. */
 export async function getTaskDistribution(
 	db: Pick<Db, 'select'>,
 	periodId: number
@@ -216,6 +221,7 @@ export async function getTaskDistribution(
 				eq(submissions.status, 'approved')
 			)
 		)
+		.where(ne(tasks.key, WELCOME_BONUS_KEY))
 		.groupBy(tasks.key, tasks.label)
 		.orderBy(desc(count), asc(tasks.label));
 }

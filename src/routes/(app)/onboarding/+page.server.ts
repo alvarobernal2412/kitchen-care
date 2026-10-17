@@ -1,8 +1,9 @@
 import { redirect } from '@sveltejs/kit';
-import { asc } from 'drizzle-orm';
+import { asc, ne } from 'drizzle-orm';
 import { getDb } from '$lib/server/db';
 import { tasks } from '$lib/server/db/schema';
 import { completeOnboarding } from '$lib/server/onboarding';
+import { WELCOME_BONUS_KEY } from '$lib/server/welcomeBonus';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async () => {
@@ -15,6 +16,7 @@ export const load: PageServerLoad = async () => {
 			needsReview: tasks.needsReview
 		})
 		.from(tasks)
+		.where(ne(tasks.key, WELCOME_BONUS_KEY))
 		.orderBy(asc(tasks.points), asc(tasks.key));
 	return { tasks: rows };
 };

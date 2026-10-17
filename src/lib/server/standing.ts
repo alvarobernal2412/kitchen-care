@@ -1,7 +1,8 @@
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, ne } from 'drizzle-orm';
 import type { Db } from './db';
 import { submissions, tasks, users } from './db/schema';
 import { getLeaderboard } from './leaderboard';
+import { WELCOME_BONUS_KEY } from './welcomeBonus';
 
 export type Standing = {
 	points: number;
@@ -45,7 +46,10 @@ export type ActivityItem = {
 	at: Date;
 };
 
-/** Latest approved (including auto-approved) entries of a period, newest first. No images. */
+/**
+ * Latest approved (including auto-approved) chores of a period, newest first. No images. The
+ * welcome bonus is private to its user and never listed here.
+ */
 export async function listRecentActivity(
 	db: Db,
 	periodId: number,
@@ -66,6 +70,7 @@ export async function listRecentActivity(
 			and(
 				eq(submissions.periodId, periodId),
 				eq(submissions.status, 'approved'),
+				ne(submissions.taskKey, WELCOME_BONUS_KEY),
 				eq(users.active, true)
 			)
 		)
