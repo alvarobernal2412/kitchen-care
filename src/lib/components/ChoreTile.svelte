@@ -152,7 +152,7 @@
 </button>
 
 <style>
-	/* Beats the legacy global button rule (blue, full width) by specificity; every property it sets is reset here. */
+	/* The tile is a button: set every box property explicitly instead of relying on browser defaults. */
 	.chore {
 		position: relative;
 		isolation: isolate;
