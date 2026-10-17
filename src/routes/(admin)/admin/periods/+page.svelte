@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
+	import { avatarUrl } from '$lib/avatar';
 	import Avatar from '$lib/components/Avatar.svelte';
 	import Notice from '$lib/components/Notice.svelte';
 
@@ -118,7 +119,7 @@
 						<ul class="winners">
 							{#each p.winners as w (w.userId)}
 								<li>
-									<Avatar name={w.username} seed={w.userId} size={28} />
+									<Avatar name={w.username} src={avatarUrl(w.avatarPath)} seed={w.userId} size={28} />
 									<span class="wname">{w.username}</span>
 									<span class="num wpts">{w.points} pts</span>
 								</li>

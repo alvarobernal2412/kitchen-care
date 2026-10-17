@@ -286,9 +286,9 @@ describe('getTopContributors', () => {
 		await sub(carol, pid, 'dishwasher', 'rejected', 50);
 		const res = await getTopContributors(t.db, pid);
 		expect(res).toEqual([
-			{ userId: u1, username: 'alice', points: 10, tasks: 2 },
-			{ userId: u2, username: 'bob', points: 10, tasks: 1 },
-			{ userId: carol, username: 'carol', points: 3, tasks: 1 }
+			{ userId: u1, username: 'alice', avatarPath: null, points: 10, tasks: 2 },
+			{ userId: u2, username: 'bob', avatarPath: null, points: 10, tasks: 1 },
+			{ userId: carol, username: 'carol', avatarPath: null, points: 3, tasks: 1 }
 		]);
 	});
 

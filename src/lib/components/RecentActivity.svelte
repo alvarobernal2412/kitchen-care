@@ -1,8 +1,16 @@
 <script lang="ts">
 	import Avatar from '$lib/components/Avatar.svelte';
+	import { avatarUrl } from '$lib/avatar';
 	import { shortAgo } from '$lib/relativeTime';
 
-	type Item = { id: number; username: string; taskKey: string; taskLabel: string; at: string };
+	type Item = {
+		id: number;
+		username: string;
+		avatarPath: string | null;
+		taskKey: string;
+		taskLabel: string;
+		at: string;
+	};
 
 	let { items, now }: { items: Item[]; now: number } = $props();
 
@@ -24,7 +32,7 @@
 	<ol class="feed">
 		{#each items as item (item.id)}
 			<li>
-				<Avatar name={item.username} size={32} />
+				<Avatar name={item.username} src={avatarUrl(item.avatarPath)} size={32} />
 				<span class="what"><b class="user">{item.username}</b><span class="act">{phrase(item)}</span></span>
 				<time datetime={item.at}>{shortAgo(item.at, now)}</time>
 			</li>

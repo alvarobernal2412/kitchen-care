@@ -232,7 +232,7 @@ describe('listPastPeriods', () => {
 		await endPeriod(t.db, periodId);
 		await t.db.update(users).set({ active: false }).where(eq(users.id, a));
 		const [p] = await listPastPeriods(t.db);
-		expect(p.winners).toEqual([{ userId: a, username: 'champ', points: 10 }]);
+		expect(p.winners).toEqual([{ userId: a, username: 'champ', points: 10, avatarPath: null }]);
 		expect(p.participants).toBe(1);
 	});
 
@@ -249,8 +249,8 @@ describe('listPastPeriods', () => {
 		const past = await listPastPeriods(t.db);
 		expect(past.map((p) => p.name)).toEqual(['Second', 'Test']);
 		expect(past[0].participants).toBe(1);
-		expect(past[0].winners).toEqual([{ userId: b, username: 'ben', points: 2 }]);
+		expect(past[0].winners).toEqual([{ userId: b, username: 'ben', points: 2, avatarPath: null }]);
 		expect(past[1].participants).toBe(2);
-		expect(past[1].winners).toEqual([{ userId: a, username: 'amy', points: 10 }]);
+		expect(past[1].winners).toEqual([{ userId: a, username: 'amy', points: 10, avatarPath: null }]);
 	});
 });

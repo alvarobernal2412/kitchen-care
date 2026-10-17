@@ -167,7 +167,9 @@ export async function getTopContributors(
 	db: Pick<Db, 'select'>,
 	periodId: number,
 	opts: { limit?: number } = {}
-): Promise<{ userId: number; username: string; points: number; tasks: number }[]> {
+): Promise<
+	{ userId: number; username: string; avatarPath: string | null; points: number; tasks: number }[]
+> {
 	const asked = opts.limit;
 	const limit =
 		asked !== undefined && Number.isFinite(asked) && asked >= 1
@@ -194,6 +196,7 @@ export async function getTopContributors(
 	return top.map((r) => ({
 		userId: r.userId,
 		username: r.username,
+		avatarPath: r.avatar,
 		points: r.points,
 		tasks: byUser.get(r.userId) ?? 0
 	}));

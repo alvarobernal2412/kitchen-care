@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import { avatarUrl } from '$lib/avatar';
 	import Avatar from '$lib/components/Avatar.svelte';
 
 	let { data } = $props();
@@ -35,7 +36,7 @@
 						<ul class="winners" aria-label="Winners">
 							{#each p.winners as w (w.userId)}
 								<li>
-									<Avatar name={w.username} seed={w.userId} size={36} />
+									<Avatar name={w.username} src={avatarUrl(w.avatarPath)} seed={w.userId} size={36} />
 									<span class="name">{w.username}</span>
 									<span class="pts">{w.points}<span class="visually-hidden"> points</span></span>
 								</li>

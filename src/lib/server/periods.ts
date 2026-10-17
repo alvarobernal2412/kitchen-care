@@ -91,7 +91,7 @@ export type PastPeriod = {
 	startsAt: Date;
 	endsAt: Date | null;
 	participants: number;
-	winners: { userId: number; username: string; points: number }[];
+	winners: { userId: number; username: string; points: number; avatarPath: string | null }[];
 };
 
 /** Ended periods, newest first, with their winners and number of scoring participants. */
@@ -108,6 +108,7 @@ export async function listPastPeriods(db: Db): Promise<PastPeriod[]> {
 			periodId: periodWinners.periodId,
 			userId: periodWinners.userId,
 			username: users.displayUsername,
+			avatarPath: users.avatarPath,
 			points: periodWinners.points
 		})
 		.from(periodWinners)
@@ -152,6 +153,6 @@ export async function listPastPeriods(db: Db): Promise<PastPeriod[]> {
 		participants: counts.get(p.id) ?? 0,
 		winners: winnerRows
 			.filter((w) => w.periodId === p.id)
-			.map(({ userId, username, points }) => ({ userId, username, points }))
+			.map(({ userId, username, points, avatarPath }) => ({ userId, username, points, avatarPath }))
 	}));
 }

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { SvelteURLSearchParams } from 'svelte/reactivity';
+	import { avatarUrl } from '$lib/avatar';
 	import { formatCount, seriesSummary } from '$lib/charts';
 	import Avatar from '$lib/components/Avatar.svelte';
 	import BarChart from '$lib/components/charts/BarChart.svelte';
@@ -127,7 +128,7 @@
 				<ol class="list">
 					{#each data.contributors as c (c.userId)}
 						<li class="contrib">
-							<Avatar name={c.username} seed={c.userId} size={32} />
+							<Avatar name={c.username} src={avatarUrl(c.avatarPath)} seed={c.userId} size={32} />
 							<span class="cname">{c.username}</span>
 							<span class="muted">{formatCount(c.tasks)} {c.tasks === 1 ? 'task' : 'tasks'}</span>
 							<strong class="num">{formatCount(c.points)} pts</strong>

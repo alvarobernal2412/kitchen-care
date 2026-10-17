@@ -236,7 +236,7 @@ describe('welcome bonus visibility', () => {
 		const p = await createPeriod(t.db, 'P');
 		const only = await join('onlybonus');
 		const top = await getTopContributors(t.db, p.id);
-		expect(top).toEqual([{ userId: only.id, username: 'onlybonus', points: 10, tasks: 0 }]);
+		expect(top).toEqual([{ userId: only.id, username: 'onlybonus', avatarPath: null, points: 10, tasks: 0 }]);
 		await logTask(t.db, only.id, 'dishwasher', { now: BEFORE });
 		expect((await getTopContributors(t.db, p.id))[0]).toMatchObject({ points: 12, tasks: 1 });
 	});
