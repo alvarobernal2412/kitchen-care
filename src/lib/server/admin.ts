@@ -43,6 +43,7 @@ export type AdminUserRow = {
 	active: boolean;
 	createdAt: Date;
 	points: number;
+	avatarPath: string | null;
 };
 
 /** Lower-cased, trimmed search text with LIKE wildcards (and the escape character) made literal. */
@@ -86,7 +87,8 @@ export async function searchUsers(
 			department: users.department,
 			active: users.active,
 			createdAt: users.createdAt,
-			points: sql<number>`coalesce(${points.total}, 0)::int`
+			points: sql<number>`coalesce(${points.total}, 0)::int`,
+			avatarPath: users.avatarPath
 		})
 		.from(users)
 		.leftJoin(points, eq(points.userId, users.id))

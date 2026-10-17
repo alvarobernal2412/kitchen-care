@@ -123,9 +123,11 @@ export async function listPending(db: Db) {
 			id: submissions.id,
 			taskKey: submissions.taskKey,
 			taskLabel: tasks.label,
+			points: tasks.points,
 			imagePath: submissions.imagePath,
 			createdAt: submissions.createdAt,
-			username: users.displayUsername
+			username: users.displayUsername,
+			avatarPath: users.avatarPath
 		})
 		.from(submissions)
 		.innerJoin(tasks, eq(tasks.key, submissions.taskKey))

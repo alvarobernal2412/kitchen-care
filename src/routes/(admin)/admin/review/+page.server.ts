@@ -38,6 +38,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 			id: p.id,
 			taskLabel: p.taskLabel,
 			username: p.username,
+			avatarPath: p.avatarPath,
+			points: p.points,
 			imagePath: p.imagePath,
 			createdAt: p.createdAt.toISOString()
 		}))

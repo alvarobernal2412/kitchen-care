@@ -1,204 +1,293 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import type { SubmitFunction } from '@sveltejs/kit';
 	import { resolve } from '$app/paths';
+	import Avatar from '$lib/components/Avatar.svelte';
+	import { avatarUrl } from '$lib/avatar';
+	import Notice from '$lib/components/Notice.svelte';
 
 	let { data, form } = $props();
 
 	let copied = $state<number | null>(null);
+
+	// The result is shown on the row, so the actions fold away once one has been sent.
+	const closing: SubmitFunction = () => async ({ formElement, update }) => {
+		formElement.closest('details')?.removeAttribute('open');
+		await update();
+	};
 
 	async function copy(userId: number, text: string) {
 		try {
 			await navigator.clipboard.writeText(text);
 			copied = userId;
 		} catch {
-			copied = null; // the field stays selectable for a manual copy
+			copied = null; // the link stays selectable for a manual copy
 		}
 	}
 </script>
 
 <svelte:head><title>Users</title></svelte:head>
 
-<h2>Users</h2>
+<div class="admin-page">
+	<header class="admin-head">
+		<h1>Users</h1>
+		<p class="sub">Search people, change roles, and hand out one-time password reset links.</p>
+	</header>
 
-<form method="GET" action={resolve('/admin/users')} class="search" role="search">
-	<label class="sr" for="user-q">Search by username</label>
-	<input id="user-q" type="text" name="q" value={data.q} maxlength="64" placeholder="Search username" />
-	<button type="submit">Search</button>
-</form>
+	<form method="GET" action={resolve('/admin/users')} class="search" role="search">
+		<label class="label" for="user-q">Search by username</label>
+		<div class="search-row">
+			<input
+				id="user-q"
+				type="text"
+				name="q"
+				class="input"
+				value={data.q}
+				maxlength="64"
+				autocomplete="off"
+			/>
+			<button type="submit" class="btn btn-quiet">Search</button>
+		</div>
+	</form>
 
-{#if data.users.length === 0}
-	<p class="muted">No users match.</p>
-{/if}
-
-<ul>
-	{#each data.users as u (u.id)}
-		<li class:inactive={!u.active}>
-			<div class="head">
-				<strong>{u.username}</strong>
-				{#if u.role === 'admin'}<span class="tag admin">admin</span>{/if}
-				{#if !u.active}<span class="tag off">deactivated</span>{/if}
-				{#if u.id === data.meId}<span class="tag">you</span>{/if}
-			</div>
-			<div class="muted">
-				{u.classification ?? 'No classification'}{u.department ? ` · ${u.department}` : ''}
-				&middot; {u.points} pts this period &middot; joined {u.createdAt.slice(0, 10)}
-			</div>
-
-			{#if form?.userId === u.id}
-				{#if form.error}<p class="error" role="alert">{form.error}</p>{/if}
-				{#if form.done}<p class="ok" role="status">{form.done}</p>{/if}
-				{#if form.resetUrl}
-					<div class="reset" role="status">
-						<label for="reset-{u.id}">Reset link for {u.username} (shown once)</label>
-						<input id="reset-{u.id}" type="text" readonly value={form.resetUrl} onfocus={(e) => e.currentTarget.select()} />
-						<button type="button" onclick={() => copy(u.id, form.resetUrl)}>
-							{copied === u.id ? 'Copied' : 'Copy link'}
-						</button>
-						<p class="muted">
-							Valid for 1 hour, single use. Share it only with the verified user. It will not be
-							shown again.
+	{#if data.users.length === 0}
+		<p class="empty">No users match.</p>
+	{:else}
+		<ul class="rows" aria-label="Users">
+			{#each data.users as u (u.id)}
+				{@const mine = form?.userId === u.id}
+				<li class="u" class:inactive={!u.active}>
+					<div class="head">
+						<Avatar name={u.username} src={avatarUrl(u.avatarPath)} seed={u.id} size={40} />
+						<div class="id">
+							<p class="name">
+								<b>{u.username}</b>
+								{#if u.role === 'admin'}<span class="chip">Admin</span>{/if}
+								{#if !u.active}<span class="chip chip-danger">Deactivated</span>{/if}
+								{#if u.id === data.meId}<span class="chip chip-neutral">You</span>{/if}
+							</p>
+							<p class="meta">
+								{u.classification ?? 'No classification'}{u.department ? `, ${u.department}` : ''}
+								&middot; joined {u.createdAt.slice(0, 10)}
+							</p>
+						</div>
+						<p class="pts">
+							<span class="display num">{u.points}</span>
+							<span class="meta">pts this period</span>
 						</p>
 					</div>
-				{/if}
-			{/if}
 
-			<div class="actions">
-				<details>
-					<summary>{u.role === 'admin' ? 'Remove admin' : 'Make admin'}</summary>
-					<form method="POST" action="?/role" use:enhance>
-						<input type="hidden" name="userId" value={u.id} />
-						<input type="hidden" name="role" value={u.role === 'admin' ? 'user' : 'admin'} />
-						<label class="confirm">
-							<input type="checkbox" name="confirm" value="yes" required />
-							{u.role === 'admin'
-								? `Confirm: ${u.username} loses admin rights.`
-								: `Confirm: ${u.username} becomes an admin.`}
-						</label>
-						<button type="submit" class:danger={u.role === 'admin'}>
-							{u.role === 'admin' ? 'Remove admin' : 'Make admin'}
-						</button>
-					</form>
-				</details>
+					{#if mine && form?.error}
+						<Notice kind="error" role="alert">{form.error}</Notice>
+					{/if}
+					{#if mine && form?.done}
+						<Notice kind="ok" role="status">{form.done}</Notice>
+					{/if}
+					{#if mine && form?.resetUrl}
+						<div class="reset" role="status">
+							<p class="label">Reset link for {u.username} (shown once)</p>
+							<code class="reset-url">{form.resetUrl}</code>
+							<div class="cluster">
+								<button type="button" class="btn btn-primary" onclick={() => copy(u.id, form.resetUrl)}
+									>Copy link</button
+								>
+								<span class="copied" aria-live="polite">{copied === u.id ? 'Copied' : ''}</span>
+							</div>
+							<p class="help">
+								Valid for 1 hour, single use. Share it only with the verified user. It will not be
+								shown again.
+							</p>
+						</div>
+					{/if}
 
-				{#if u.active}
-					<details>
-						<summary>Deactivate</summary>
-						<form method="POST" action="?/active" use:enhance>
-							<input type="hidden" name="userId" value={u.id} />
-							<input type="hidden" name="active" value="false" />
-							<label class="confirm">
-								<input type="checkbox" name="confirm" value="yes" required />
-								Confirm: {u.username} is signed out everywhere and cannot sign in.
-							</label>
-							<button type="submit" class="danger">Deactivate</button>
-						</form>
+					<details class="acts">
+						<summary class="btn btn-quiet">Actions<span class="visually-hidden"> for {u.username}</span></summary>
+						<div class="panel">
+							<form method="POST" action="?/role" use:enhance={closing} class="act">
+								<input type="hidden" name="userId" value={u.id} />
+								<input type="hidden" name="role" value={u.role === 'admin' ? 'user' : 'admin'} />
+								<label class="check">
+									<input type="checkbox" name="confirm" value="yes" required />
+									<span
+										>{u.role === 'admin'
+											? `Confirm: ${u.username} loses admin rights.`
+											: `Confirm: ${u.username} becomes an admin.`}</span
+									>
+								</label>
+								<button type="submit" class="btn btn-quiet" class:btn-danger={u.role === 'admin'}>
+									{u.role === 'admin' ? 'Remove admin' : 'Make admin'}
+								</button>
+							</form>
+
+							{#if u.active}
+								<form method="POST" action="?/active" use:enhance={closing} class="act">
+									<input type="hidden" name="userId" value={u.id} />
+									<input type="hidden" name="active" value="false" />
+									<label class="check">
+										<input type="checkbox" name="confirm" value="yes" required />
+										<span>Confirm: {u.username} is signed out everywhere and cannot sign in.</span>
+									</label>
+									<button type="submit" class="btn btn-danger">Deactivate</button>
+								</form>
+							{:else}
+								<form method="POST" action="?/active" use:enhance={closing} class="act">
+									<input type="hidden" name="userId" value={u.id} />
+									<input type="hidden" name="active" value="true" />
+									<button type="submit" class="btn btn-quiet">Reactivate</button>
+								</form>
+							{/if}
+
+							<form method="POST" action="?/reset" use:enhance={closing} class="act">
+								<input type="hidden" name="userId" value={u.id} />
+								<button type="submit" class="btn btn-quiet">Generate reset link</button>
+							</form>
+						</div>
 					</details>
-				{:else}
-					<form method="POST" action="?/active" use:enhance>
-						<input type="hidden" name="userId" value={u.id} />
-						<input type="hidden" name="active" value="true" />
-						<button type="submit">Reactivate</button>
-					</form>
-				{/if}
-
-				<form method="POST" action="?/reset" use:enhance>
-					<input type="hidden" name="userId" value={u.id} />
-					<button type="submit">Generate reset link</button>
-				</form>
-			</div>
-		</li>
-	{/each}
-</ul>
+				</li>
+			{/each}
+		</ul>
+	{/if}
+</div>
 
 <style>
-	.sr {
-		position: absolute;
-		width: 1px;
-		height: 1px;
-		overflow: hidden;
-		clip-path: inset(50%);
-	}
 	.search {
+		margin-bottom: var(--sp-5);
+	}
+	.search-row {
 		display: flex;
-		gap: 0.5rem;
-		margin-bottom: 1rem;
+		gap: var(--sp-2);
+		margin-top: 6px;
 	}
-	.muted {
-		color: #6b7280;
-		font-size: 0.9rem;
+	.search-row .input {
+		flex: 1;
+		min-width: 0;
 	}
-	ul {
-		padding: 0;
-		list-style: none;
+	@media (min-width: 900px) {
+		.search {
+			max-width: 440px;
+		}
 	}
-	li {
-		padding: 0.75rem;
-		margin-bottom: 0.75rem;
-		background: white;
-		border: 1px solid #e5e7eb;
-		border-radius: 8px;
+
+	.u {
+		display: grid;
+		gap: var(--sp-3);
 	}
-	li.inactive {
-		opacity: 0.75;
+	.u.inactive .head {
+		opacity: 0.8;
 	}
 	.head {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.4rem;
-		align-items: center;
-	}
-	.tag {
-		padding: 0.05rem 0.5rem;
-		font-size: 0.75rem;
-		background: #e5e7eb;
-		border-radius: 999px;
-	}
-	.tag.admin {
-		color: white;
-		background: #1d4ed8;
-	}
-	.tag.off {
-		color: white;
-		background: #6b7280;
-	}
-	.actions {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.5rem;
-		align-items: flex-start;
-		margin-top: 0.6rem;
-	}
-	.actions form {
 		display: grid;
-		gap: 0.5rem;
-		margin-top: 0.4rem;
+		grid-template-columns: 40px minmax(0, 1fr);
+		align-items: center;
+		gap: var(--sp-3);
 	}
-	summary {
-		cursor: pointer;
-		padding: 0.5rem 0.75rem;
-		color: #1d4ed8;
-		border: 1px solid #1d4ed8;
-		border-radius: 8px;
-	}
-	.confirm {
+	.name {
 		display: flex;
-		align-items: flex-start;
-		gap: 0.5rem;
-		font-size: 0.9rem;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: var(--sp-1) var(--sp-2);
+		max-width: none;
 	}
+	.name b {
+		font-weight: 600;
+		overflow-wrap: anywhere;
+	}
+	.meta {
+		color: var(--muted);
+		font-size: var(--fs-small);
+		line-height: 1.4;
+	}
+	.pts {
+		grid-column: 2;
+		display: flex;
+		align-items: baseline;
+		gap: var(--sp-2);
+	}
+	.pts .display {
+		font-size: 22px;
+		font-weight: 800;
+		line-height: 1;
+	}
+
 	.reset {
 		display: grid;
-		gap: 0.4rem;
-		padding: 0.6rem;
-		margin-top: 0.5rem;
-		background: #fef9c3;
-		border-radius: 8px;
+		gap: var(--sp-3);
+		padding: var(--sp-4);
+		border: 1px solid var(--accent);
+		border-radius: var(--r-ctl);
+		background: var(--accent-wash);
+		color: var(--ink);
 	}
-	.ok {
-		color: #166534;
+	.reset .label {
+		max-width: none;
 	}
-	.error {
-		margin: 0.4rem 0 0;
-		color: #991b1b;
+	.reset .help {
+		color: var(--ink);
+	}
+	.reset-url {
+		display: block;
+		padding: var(--sp-3);
+		border-radius: var(--r-chip);
+		background: var(--surface);
+		font-family: var(--font-mono);
+		font-size: 13px;
+		line-height: 1.4;
+		overflow-wrap: anywhere;
+		word-break: break-all;
+		user-select: all;
+	}
+	.copied {
+		color: var(--accent-ink);
+		font-weight: 600;
+		font-size: var(--fs-ui);
+	}
+
+	.acts summary {
+		display: inline-flex;
+		list-style: none;
+	}
+	.acts summary::-webkit-details-marker {
+		display: none;
+	}
+	.panel {
+		display: grid;
+		gap: var(--sp-4);
+		margin-top: var(--sp-3);
+		padding: var(--sp-3) 0 0;
+		border-top: 1px solid var(--line);
+	}
+	.act {
+		display: grid;
+		gap: var(--sp-1);
+		justify-items: start;
+	}
+	.act + .act {
+		padding-top: var(--sp-3);
+		border-top: 1px solid var(--line);
+		width: 100%;
+	}
+
+	@media (min-width: 900px) {
+		.u {
+			padding: var(--sp-4) var(--sp-5);
+		}
+		.head {
+			grid-template-columns: 40px minmax(0, 1fr) auto;
+		}
+		.pts {
+			grid-column: 3;
+			flex-direction: column;
+			align-items: flex-end;
+			gap: 2px;
+		}
+		.panel {
+			grid-template-columns: repeat(3, minmax(0, 1fr));
+			gap: var(--sp-5);
+		}
+		.act + .act {
+			padding-top: 0;
+			border-top: 0;
+			width: auto;
+		}
 	}
 </style>

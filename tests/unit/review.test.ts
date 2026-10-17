@@ -26,6 +26,7 @@ import {
 	NotAdminError,
 	PeriodClosedError,
 	approve,
+	listPending,
 	reject
 } from '../../src/lib/server/review';
 
@@ -118,6 +119,17 @@ describe('submitPhotoTask', () => {
 		expect(await files()).toHaveLength(3);
 		// another task is unaffected
 		await submitPhotoTask(t.db, user, 'milk', await img(), { uploadDir: dir });
+	});
+});
+
+describe('listPending', () => {
+	it('carries what the review row shows: task points and the submitter avatar', async () => {
+		await t.db.update(users).set({ avatarPath: 'a'.repeat(32) + '.webp' }).where(eq(users.id, user));
+		await submitPhotoTask(t.db, user, 'beans', await img(), { uploadDir: dir, now: T0 });
+		const [row] = await listPending(t.db);
+		expect(row).toMatchObject({ taskKey: 'beans', username: 'member', avatarPath: 'a'.repeat(32) + '.webp' });
+		expect(row.points).toBeGreaterThan(0);
+		await t.db.update(users).set({ avatarPath: null }).where(eq(users.id, user));
 	});
 });
 

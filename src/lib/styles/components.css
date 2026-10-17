@@ -255,3 +255,77 @@ textarea.input {
 		opacity: 0.45;
 	}
 }
+
+/* ---- admin screens ---- */
+.admin-page {
+	padding: var(--sp-5) 0 var(--sp-6);
+}
+.admin-head {
+	margin-bottom: var(--sp-5);
+}
+.admin-head .sub {
+	margin-top: var(--sp-2);
+	color: var(--muted);
+	font-size: var(--fs-ui);
+}
+/* Page-level results sit between the heading and the content. */
+.admin-page > .notice {
+	margin-bottom: var(--sp-4);
+}
+@media (min-width: 900px) {
+	.admin-page {
+		padding-top: var(--sp-6);
+	}
+	.admin-head h1 {
+		font-size: 40px;
+		line-height: 1;
+	}
+	.admin-head .sub {
+		font-size: var(--fs-body);
+	}
+}
+
+/* A list on a glazed tile: flat rows separated by grout lines. */
+.rows {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	background: var(--surface);
+	border: 1px solid var(--line);
+	border-radius: var(--r-tile);
+}
+.rows > li {
+	padding: var(--sp-4);
+}
+.rows > li + li {
+	border-top: 1px solid var(--line);
+}
+.empty {
+	padding: var(--sp-5) 0;
+	color: var(--muted);
+}
+
+/* State words are text first; the tint only supports them. */
+.chip-neutral {
+	background: var(--recess);
+	color: var(--ink);
+}
+
+/* A confirmation checkbox sized as a 44px target. */
+.check {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--sp-3);
+	min-height: 44px;
+	padding: 10px 0;
+	font-size: var(--fs-ui);
+	line-height: 1.35;
+	cursor: pointer;
+}
+.check input {
+	flex: none;
+	width: 22px;
+	height: 22px;
+	margin: 0;
+	accent-color: var(--accent);
+}

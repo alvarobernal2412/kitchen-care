@@ -74,7 +74,8 @@ describe('searchUsers', () => {
 			role: 'user',
 			classification: 'Student',
 			active: true,
-			points: 0
+			points: 0,
+			avatarPath: null
 		});
 		expect(row.createdAt).toBeInstanceOf(Date);
 	});
