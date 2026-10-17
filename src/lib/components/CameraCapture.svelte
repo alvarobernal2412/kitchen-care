@@ -2,6 +2,7 @@
 	import { onDestroy, onMount } from 'svelte';
 	import { CameraError, isCameraSupported, startCamera, type CameraSession } from '$lib/client/camera';
 	import { compressForUpload } from '$lib/client/compress';
+	import { IconFlag } from '$lib/icons';
 
 	type Source = ImageBitmap | HTMLCanvasElement;
 
@@ -54,8 +55,16 @@
 		}
 	}
 
+	// Focus moves into the overlay on open and goes back to whatever opened it on close.
+	const opener = typeof document !== 'undefined' ? document.activeElement : null;
+	let dialog: HTMLDivElement | undefined = $state();
+
 	onMount(() => {
+		dialog?.focus();
 		if (supported) void start();
+		return () => {
+			if (opener instanceof HTMLElement && opener.isConnected) opener.focus();
+		};
 	});
 
 	function release() {
@@ -141,9 +150,44 @@
 		release();
 		onCancel();
 	}
+
+	function onKeydown(e: KeyboardEvent) {
+		if (e.key === 'Escape') {
+			e.preventDefault();
+			cancel();
+			return;
+		}
+		if (e.key !== 'Tab' || !dialog) return;
+		// Keep Tab inside the overlay.
+		const items = [
+			...dialog.querySelectorAll<HTMLElement>('button:not(:disabled), input[type="file"]')
+		];
+		if (items.length === 0) {
+			e.preventDefault();
+			return;
+		}
+		const first = items[0];
+		const last = items[items.length - 1];
+		const active = document.activeElement;
+		if (e.shiftKey && (active === first || active === dialog)) {
+			e.preventDefault();
+			last.focus();
+		} else if (!e.shiftKey && active === last) {
+			e.preventDefault();
+			first.focus();
+		}
+	}
 </script>
 
-<div class="overlay" role="dialog" aria-modal="true" aria-label="Take a photo">
+<div
+	class="overlay"
+	role="dialog"
+	aria-modal="true"
+	aria-label="Take a photo"
+	tabindex="-1"
+	bind:this={dialog}
+	onkeydown={onKeydown}
+>
 	{#if supported}
 		<video bind:this={video} class="feed" class:hidden={phase !== 'live'} playsinline muted></video>
 	{/if}
@@ -151,9 +195,9 @@
 	{#if phase === 'review' && !supported && !previewUrl}
 		<div class="panel">
 			<p>Your browser can't open the camera here. Use your phone's camera to take a photo.</p>
-			<label class="btn primary">
-				Take photo
-				<input type="file" accept="image/*" capture="environment" onchange={onFile} hidden />
+			<label class="btn primary file">
+				Choose a photo
+				<input class="visually-hidden" type="file" accept="image/*" capture="environment" onchange={onFile} />
 			</label>
 		</div>
 	{:else if phase === 'starting'}
@@ -162,32 +206,37 @@
 		<div class="panel" aria-live="polite"><p>{status}</p></div>
 	{:else if phase === 'error'}
 		<div class="panel" role="alert">
-			{#if errorCode === 'permission-denied'}
-				<p>Camera access was blocked. Allow the camera for this site in your browser settings, then try again.</p>
-			{:else if errorCode === 'insecure-context'}
-				<p>The camera only works on a secure (HTTPS) connection.</p>
-			{:else if errorCode === 'no-camera'}
-				<p>No camera was found on this device.</p>
-			{:else}
-				<p>{errorMessage}</p>
-			{/if}
-			{#if errorCode !== 'insecure-context'}
-				<button type="button" class="btn primary" onclick={retake}>Try again</button>
-			{/if}
+			<div class="error-box">
+				{#if errorCode === 'permission-denied'}
+					<p>Camera access was blocked. Allow the camera for this site in your browser settings, then try again.</p>
+				{:else if errorCode === 'insecure-context'}
+					<p>The camera only works on a secure (HTTPS) connection.</p>
+				{:else if errorCode === 'no-camera'}
+					<p>No camera was found on this device.</p>
+				{:else}
+					<p>{errorMessage}</p>
+				{/if}
+			</div>
+			<div class="actions">
+				{#if errorCode !== 'insecure-context'}
+					<button type="button" class="btn primary" onclick={retake}>Try again</button>
+				{/if}
+				<button type="button" class="btn" onclick={cancel}>Close</button>
+			</div>
 		</div>
 	{:else if phase === 'review' && previewUrl}
 		<img class="feed" src={previewUrl} alt="Captured preview" />
 		{#if detect && checkFailed}
-			<p class="banner warn" role="alert">Couldn't check the photo for cutlery</p>
+			<p class="banner" role="alert"><IconFlag size={20} /><span>Couldn't check the photo for cutlery</span></p>
 		{:else if detect && detected === false}
-			<p class="banner warn" role="alert">No cutlery detected, retake</p>
+			<p class="banner" role="alert"><IconFlag size={20} /><span>No cutlery detected, retake</span></p>
 		{/if}
 	{/if}
 
 	<div class="bar">
 		<button type="button" class="btn" onclick={cancel}>Cancel</button>
 		{#if phase === 'live'}
-			<button type="button" class="shutter" aria-label="Take photo" onclick={snap}></button>
+			<button type="button" class="shutter" aria-label="Take photo" onclick={snap}><span></span></button>
 		{:else if phase === 'review' && previewUrl}
 			<button type="button" class="btn" onclick={retake}>Retake</button>
 			<button type="button" class="btn primary" onclick={confirm}>Use photo</button>
@@ -196,14 +245,23 @@
 </div>
 
 <style>
+	/* Always dark, whatever the colour scheme: the --cam-* tokens are the same in both. */
 	.overlay {
 		position: fixed;
 		inset: 0;
-		z-index: 100;
+		z-index: var(--z-overlay);
 		display: flex;
 		flex-direction: column;
-		background: #000;
-		color: #fff;
+		background: var(--cam-bg);
+		color: var(--cam-fg);
+		padding-top: env(safe-area-inset-top, 0px);
+	}
+	.overlay:focus {
+		outline: none;
+	}
+	.overlay :focus-visible {
+		outline: 2px solid var(--cam-focus);
+		outline-offset: 2px;
 	}
 	.feed {
 		flex: 1;
@@ -220,59 +278,98 @@
 		flex-direction: column;
 		align-items: center;
 		justify-content: center;
-		gap: 1rem;
-		padding: 1.5rem;
+		gap: var(--sp-4);
+		padding: var(--sp-5) var(--gutter);
 		text-align: center;
+	}
+	.panel p {
+		max-width: 34ch;
+		margin-inline: auto;
+		color: var(--cam-fg);
+	}
+	.error-box {
+		padding: var(--sp-4);
+		border-radius: var(--r-ctl);
+		background: var(--cam-error-bg);
+	}
+	.error-box p {
+		color: var(--cam-error-fg);
+	}
+	.actions {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: center;
+		gap: var(--sp-3);
 	}
 	.banner {
 		position: absolute;
-		top: 1rem;
-		left: 1rem;
-		right: 1rem;
+		top: calc(var(--sp-4) + env(safe-area-inset-top, 0px));
+		left: var(--gutter);
+		right: var(--gutter);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: var(--sp-2);
 		margin: 0;
-		padding: 0.75rem 1rem;
-		border-radius: 8px;
+		padding: var(--sp-3) var(--sp-4);
+		max-width: none;
+		border-radius: var(--r-ctl);
+		background: var(--cam-warn-bg);
+		color: var(--cam-warn-fg);
 		font-weight: 600;
-		text-align: center;
-	}
-	.warn {
-		background: #d97706;
 	}
 	.bar {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		gap: 0.75rem;
-		padding: 1rem;
-		padding-bottom: calc(1rem + env(safe-area-inset-bottom));
-		background: rgba(0, 0, 0, 0.7);
+		gap: var(--sp-3);
+		padding: var(--sp-4) max(var(--gutter), env(safe-area-inset-right, 0px));
+		padding-bottom: calc(var(--sp-4) + env(safe-area-inset-bottom, 0px));
+		background: var(--cam-bar);
+		border-top: 1px solid var(--cam-line);
 	}
 	.btn {
-		min-height: 48px;
-		min-width: 48px;
-		padding: 0 1.25rem;
-		border: 1px solid #fff;
-		border-radius: 24px;
-		background: transparent;
-		color: #fff;
-		font-size: 1rem;
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
+		min-height: 48px;
+		min-width: 48px;
+		padding: 0 var(--sp-4);
+		white-space: nowrap;
+		border: 1px solid var(--cam-line);
+		border-radius: var(--r-ctl);
+		background: transparent;
+		color: var(--cam-fg);
+		font-size: var(--fs-body);
+		font-weight: 600;
 		cursor: pointer;
 	}
 	.btn.primary {
-		background: #16a34a;
-		border-color: #16a34a;
+		background: var(--cam-accent);
+		border-color: var(--cam-accent);
+		color: var(--cam-on-accent);
+	}
+	.file:focus-within {
+		outline: 2px solid var(--cam-focus);
+		outline-offset: 2px;
 	}
 	.shutter {
+		display: grid;
+		place-items: center;
 		width: 72px;
 		height: 72px;
+		padding: 0;
+		border: 3px solid var(--cam-fg);
 		border-radius: 50%;
-		border: 4px solid #fff;
-		background: #fff;
-		box-shadow: inset 0 0 0 4px #000;
+		background: transparent;
 		cursor: pointer;
+		transition: transform var(--dur-fast) var(--ease-press);
+	}
+	.shutter span {
+		width: 54px;
+		height: 54px;
+		border-radius: 50%;
+		background: var(--cam-fg);
 	}
 	.shutter:active {
 		transform: scale(0.94);
