@@ -34,6 +34,11 @@
 
 <h1>Create an account</h1>
 <p class="slogan">Good karma pays out: Rack up your credits for this semester's grand reward.</p>
+{#if data.welcomeBonus.open}
+	<p class="offer" data-testid="welcome-offer">
+		Sign up before {data.welcomeBonus.untilLabel} and start with {data.welcomeBonus.points} credits.
+	</p>
+{/if}
 
 <form
 	method="POST"
@@ -126,3 +131,11 @@
 </form>
 
 <p class="alt">Already have an account? <a href={resolve('/login')}>Log in</a></p>
+
+<style>
+	.offer {
+		margin-top: var(--sp-2);
+		color: var(--accent-ink);
+		font-weight: 600;
+	}
+</style>

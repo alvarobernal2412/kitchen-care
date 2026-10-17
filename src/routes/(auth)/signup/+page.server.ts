@@ -5,6 +5,7 @@ import { login } from '$lib/server/auth/session';
 import { AuthError, signUp } from '$lib/server/auth/users';
 import { getDb } from '$lib/server/db';
 import { DEPARTMENTS } from '$lib/server/db/schema';
+import { WELCOME_BONUS_POINTS, welcomeBonusOffer } from '$lib/server/welcomeBonus';
 import { hit } from '$lib/server/ratelimit';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -15,9 +16,14 @@ const schema = z.object({
 	department: z.string().optional()
 });
 
-export const load: PageServerLoad = ({ locals }) => {
+export const load: PageServerLoad = async ({ locals }) => {
 	if (locals.user) redirect(303, '/');
-	return { departments: [...DEPARTMENTS] };
+	// Only a flag, a date and the amount reach the page: nothing about the period itself.
+	const offer = await welcomeBonusOffer(getDb(), new Date());
+	return {
+		departments: [...DEPARTMENTS],
+		welcomeBonus: { open: offer.open, untilLabel: offer.untilLabel, points: WELCOME_BONUS_POINTS }
+	};
 };
 
 export const actions: Actions = {
