@@ -20,7 +20,7 @@
 {:else}
 	<!-- First-run flow: no navigation, just the skip link and the main landmark. -->
 	<a class="skip-link" href="#main">Skip to content</a>
-	<main id="main" tabindex="-1">
+	<main id="main" class="page-main" tabindex="-1">
 		{@render children()}
 	</main>
 {/if}
@@ -33,24 +33,5 @@
 	main {
 		min-height: 100dvh;
 		padding-inline: var(--gutter);
-	}
-	main:focus {
-		outline: none;
-	}
-	.skip-link {
-		position: fixed;
-		top: var(--sp-2);
-		left: var(--sp-2);
-		z-index: var(--z-skip);
-		padding: var(--sp-3) var(--sp-4);
-		background: var(--surface);
-		color: var(--accent-ink);
-		font-weight: 600;
-		border: 2px solid var(--accent);
-		border-radius: var(--r-ctl);
-		transform: translateY(-200%);
-	}
-	.skip-link:focus {
-		transform: none;
 	}
 </style>

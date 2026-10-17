@@ -329,3 +329,25 @@ textarea.input {
 	margin: 0;
 	accent-color: var(--accent);
 }
+
+/* ---- page frame (AppShell and the first-run layout) ---- */
+.skip-link {
+	position: fixed;
+	top: calc(var(--sp-2) + env(safe-area-inset-top, 0px));
+	left: var(--sp-2);
+	z-index: var(--z-skip);
+	padding: var(--sp-3) var(--sp-4);
+	background: var(--surface);
+	color: var(--accent-ink);
+	font-weight: 600;
+	border: 2px solid var(--accent);
+	border-radius: var(--r-ctl);
+	transform: translateY(-200%);
+}
+.skip-link:focus {
+	transform: none;
+}
+/* The skip target takes focus programmatically; it needs no ring. */
+.page-main:focus {
+	outline: none;
+}

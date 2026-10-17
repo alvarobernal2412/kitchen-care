@@ -127,7 +127,7 @@
 				{/each}
 			</nav>
 		{/if}
-		<main id="main" tabindex="-1">
+		<main id="main" class="page-main" tabindex="-1">
 			{@render children()}
 		</main>
 	</div>
@@ -145,23 +145,6 @@
 
 <style>
 	/* ---------- phone first: bottom tab bar ---------- */
-	.skip-link {
-		position: fixed;
-		top: var(--sp-2);
-		left: var(--sp-2);
-		z-index: var(--z-skip);
-		padding: var(--sp-3) var(--sp-4);
-		background: var(--surface);
-		color: var(--accent-ink);
-		font-weight: 600;
-		border: 2px solid var(--accent);
-		border-radius: var(--r-ctl);
-		transform: translateY(-200%);
-	}
-	.skip-link:focus {
-		transform: none;
-	}
-
 	.shell {
 		min-height: 100dvh;
 	}
@@ -178,9 +161,6 @@
 		max-width: 960px;
 		margin-inline: auto;
 		padding-inline: var(--gutter);
-	}
-	main:focus {
-		outline: none;
 	}
 
 	.tabbar {
