@@ -7,8 +7,20 @@ import { getDb } from '$lib/server/db';
 import { recordAppOpen, shouldRecordAppOpen } from '$lib/server/events';
 import { isPublicPath } from '$lib/server/publicPaths';
 
+/**
+ * The dev server builds request URLs as http://<Host>. Behind an https tunnel (phone testing) the
+ * browser's Origin is https, so for the same-origin check only, trust X-Forwarded-Proto in dev.
+ * Production gets its origin from the ORIGIN variable and never takes this branch.
+ */
+function originCheckUrl(request: Request, url: URL): URL {
+	if (dev && request.headers.get('x-forwarded-proto') === 'https' && url.protocol === 'http:') {
+		return new URL(url.href.replace(/^http:/, 'https:'));
+	}
+	return url;
+}
+
 export const handle: Handle = async ({ event, resolve }) => {
-	if (isForbiddenApiMutation(event.request, event.url)) {
+	if (isForbiddenApiMutation(event.request, originCheckUrl(event.request, event.url))) {
 		return new Response('Cross-origin request blocked', { status: 403 });
 	}
 

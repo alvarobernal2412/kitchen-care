@@ -3,6 +3,9 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
 	plugins: [sveltekit()],
+	// Dev server only (preview and production builds are unaffected): lets a Cloudflare quick tunnel
+	// reach `npm run dev` so a phone can open the app over https (the camera needs a secure context).
+	server: { allowedHosts: ['.trycloudflare.com'] },
 	test: {
 		include: ['tests/unit/**/*.test.ts'],
 		globalSetup: ['tests/globalSetup.ts'],
