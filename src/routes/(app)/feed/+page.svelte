@@ -6,6 +6,7 @@
 
 	let { data, form } = $props();
 
+	let title = $state('');
 	let draft = $state('');
 	let sending = $state(false);
 	// Without JavaScript the button stays enabled so the server can answer an empty post inline.
@@ -14,6 +15,20 @@
 	// Restore the text after a no-JS failed submit.
 	// svelte-ignore state_referenced_locally
 	if (form?.body) draft = form.body;
+	// svelte-ignore state_referenced_locally
+	if (form?.title) title = form.title;
+
+	const titleLength = $derived([...title].length);
+	const titleLeft = $derived(data.titleMax - titleLength);
+	const titleStatus = $derived(
+		titleLeft < 0
+			? `${-titleLeft} characters over the limit`
+			: titleLeft <= 15
+				? `${titleLeft} characters left`
+				: ''
+	);
+	const titleError = $derived(form?.titleError ?? '');
+	const bodyError = $derived(form?.bodyError ?? form?.error ?? '');
 
 	const length = $derived([...draft].length);
 	const left = $derived(data.postMax - length);
@@ -25,7 +40,10 @@
 				? `${left} characters left`
 				: ''
 	);
-	const describedBy = $derived(form?.error ? 'compose-count compose-error' : 'compose-count');
+	const titleDescribedBy = $derived(
+		titleError ? 'compose-title-count compose-title-error' : 'compose-title-count'
+	);
+	const describedBy = $derived(bodyError ? 'compose-count compose-error' : 'compose-count');
 </script>
 
 <svelte:head><title>Feed</title></svelte:head>
@@ -41,12 +59,36 @@
 			use:enhance={() => {
 				sending = true;
 				return async ({ result, update }) => {
-					if (result.type === 'success') draft = '';
+					if (result.type === 'success') {
+						title = '';
+						draft = '';
+					}
 					await update({ reset: false });
 					sending = false;
 				};
 			}}
 		>
+			<label class="label" for="compose-title">Title</label>
+			<input
+				id="compose-title"
+				name="title"
+				class="input"
+				type="text"
+				autocomplete="off"
+				aria-required="true"
+				maxlength={data.titleMax}
+				aria-describedby={titleDescribedBy}
+				aria-invalid={titleError ? 'true' : undefined}
+				bind:value={title}
+			/>
+			<div class="actions title-meta">
+				<span id="compose-title-count" class="help" class:over={titleLeft < 0}
+					>{titleLength}/{data.titleMax}</span
+				>
+			</div>
+			<p class="visually-hidden" role="status" aria-live="polite">{titleStatus}</p>
+			{#if titleError}<p id="compose-title-error" class="error" role="alert">{titleError}</p>{/if}
+
 			<label class="label" for="compose-body">Share something with the kitchen</label>
 			<textarea
 				id="compose-body"
@@ -55,17 +97,17 @@
 				rows="3"
 				maxlength={data.postMax}
 				aria-describedby={describedBy}
-				aria-invalid={form?.error ? 'true' : undefined}
+				aria-invalid={bodyError ? 'true' : undefined}
 				bind:value={draft}
 			></textarea>
 			<div class="actions">
 				<span id="compose-count" class="help" class:over={left < 0}>{length}/{data.postMax}</span>
-				<button type="submit" class="btn btn-primary post" disabled={sending || (mounted && !draft.trim())}>
+				<button type="submit" class="btn btn-primary post" disabled={sending || (mounted && (!title.trim() || !draft.trim()))}>
 					Post
 				</button>
 			</div>
 			<p class="visually-hidden" role="status" aria-live="polite">{status}</p>
-			{#if form?.error}<p id="compose-error" class="error" role="alert">{form.error}</p>{/if}
+			{#if bodyError}<p id="compose-error" class="error" role="alert">{bodyError}</p>{/if}
 		</form>
 	{:else}
 		<p class="back"><a href={resolve('/feed')}>&larr; Back to newest</a></p>
@@ -106,9 +148,16 @@
 		border-radius: var(--r-ctl);
 		background: var(--surface);
 	}
+	.title-meta {
+		justify-content: flex-end;
+		margin-top: 0;
+		margin-bottom: var(--sp-2);
+	}
+	.compose .input {
+		background: var(--ground);
+	}
 	.compose textarea {
 		resize: vertical;
-		background: var(--ground);
 	}
 	.actions {
 		display: flex;

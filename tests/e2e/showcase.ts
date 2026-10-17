@@ -121,7 +121,8 @@ export async function seedShowcase(): Promise<Showcase> {
 		.insert(schema.posts)
 		.values({
 			userId: ana.id,
-			body: 'Descaled the coffee machine. It sounds happier already.',
+			title: 'Descaled the coffee machine',
+			body: 'It sounds happier already.',
 			milestoneSubmissionId: milestone.id,
 			imagePath: await writeProof('#8fa39a'),
 			createdAt: new Date(Date.now() - 50 * 60_000)
@@ -131,13 +132,14 @@ export async function seedShowcase(): Promise<Showcase> {
 		.insert(schema.posts)
 		.values({
 			userId: me.id,
+			title: 'Thank you for the oat milk',
 			body: 'Whoever keeps bringing oat milk: thank you.',
 			createdAt: new Date(Date.now() - 5 * 3_600_000)
 		})
 		.returning();
 	const [p3] = await db
 		.insert(schema.posts)
-		.values({ userId: ben.id, body: 'Quiet kitchen this morning.', createdAt: new Date(Date.now() - 2 * day) })
+		.values({ userId: ben.id, title: 'Quiet morning', body: 'Quiet kitchen this morning.', createdAt: new Date(Date.now() - 2 * day) })
 		.returning();
 	await db.insert(schema.comments).values([
 		{ postId: p1.id, userId: me.id, body: 'You are a hero.', createdAt: new Date(Date.now() - 40 * 60_000) },

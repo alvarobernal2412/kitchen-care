@@ -56,6 +56,7 @@
 								<RelativeTime iso={post.createdAt} class="when" />
 							</p>
 						</header>
+						<p class="post-title">{post.title}</p>
 						{#if post.body}<p class="body">{post.body}</p>{/if}
 						{#if post.imagePath}
 							<div class="proof">
@@ -77,7 +78,7 @@
 								<label class="check">
 									<input type="checkbox" name="confirm" value="yes" required />
 									<span
-										>Confirm: delete this post, its {post.commentCount}
+										>Confirm: delete the post “{post.title}”, its {post.commentCount}
 										{post.commentCount === 1 ? 'comment' : 'comments'} and reactions.</span
 									>
 								</label>
@@ -173,6 +174,11 @@
 	.name :global(.when) {
 		color: var(--muted);
 		font-size: var(--fs-small);
+	}
+	.post-title {
+		max-width: none;
+		font-weight: 700;
+		overflow-wrap: anywhere;
 	}
 	.body {
 		white-space: pre-wrap;

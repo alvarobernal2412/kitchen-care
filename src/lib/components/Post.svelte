@@ -59,8 +59,9 @@
 			</div>
 		</header>
 
+		<h2 class={post.milestone ? 'headline' : 'title'}>{post.title}</h2>
 		{#if post.body}
-			<p class={post.milestone ? 'headline' : 'body'}>{post.body}</p>
+			<p class="body">{post.body}</p>
 		{/if}
 
 		{#if post.imagePath && !imageBroken}
@@ -131,6 +132,16 @@
 		color: var(--muted);
 		font-size: var(--fs-small);
 	}
+	.title {
+		max-width: none;
+		margin-top: var(--sp-3);
+		font: 700 19px / 1.2 var(--font-display);
+		letter-spacing: -0.015em;
+		overflow-wrap: anywhere;
+	}
+	.title + .body {
+		margin-top: var(--sp-1);
+	}
 	.body {
 		max-width: none;
 		margin-top: var(--sp-3);
@@ -142,8 +153,10 @@
 		margin-top: var(--sp-3);
 		font: 700 24px / 1.12 var(--font-display);
 		letter-spacing: -0.02em;
-		white-space: pre-wrap;
 		overflow-wrap: anywhere;
+	}
+	.headline + .body {
+		margin-top: var(--sp-2);
 	}
 	.photo {
 		position: relative;

@@ -396,7 +396,7 @@ test.describe('history', () => {
 async function mkPost(
 	userId: number,
 	body: string,
-	extra: { createdAt?: Date; imagePath?: string; milestone?: boolean } = {}
+	extra: { title?: string; createdAt?: Date; imagePath?: string; milestone?: boolean } = {}
 ) {
 	let milestoneSubmissionId: number | undefined;
 	if (extra.milestone) milestoneSubmissionId = (await award(userId, 10, 'descale')).id;
@@ -404,6 +404,7 @@ async function mkPost(
 		.insert(schema.posts)
 		.values({
 			userId,
+			title: extra.title ?? [...body].slice(0, 80).join(''),
 			body,
 			imagePath: extra.imagePath ?? null,
 			milestoneSubmissionId,
@@ -445,6 +446,7 @@ test.describe('feed', () => {
 		const lena = await mkUser('f-lena', { classification: 'Employee', department: IRG });
 		const file = await writeProof();
 		await mkPost(lena.id, `${lena.name} just did: Descale the coffee machine! 🎉`, {
+			title: 'Descaled the coffee machine',
 			milestone: true,
 			imagePath: file
 		});
@@ -474,6 +476,7 @@ test.describe('feed', () => {
 		const me = await mkUser('f-me');
 		const lena = await mkUser('f-lena');
 		await mkPost(lena.id, `${lena.name} just did: Deep clean! 🎉`, {
+			title: 'Deep cleaned the kitchen and fridge',
 			milestone: true,
 			imagePath: `${randomBytes(16).toString('hex')}.webp` // never written to disk
 		});
@@ -607,12 +610,56 @@ test.describe('feed', () => {
 		await page.goto('/feed');
 		const box = page.getByLabel('Share something with the kitchen');
 		const post = page.getByRole('button', { name: 'Post', exact: true });
+		const title = page.getByLabel('Title', { exact: true });
 		await expect(post).toBeDisabled();
 		await box.fill('Hello kitchen');
+		await expect(post).toBeDisabled(); // a body alone is not enough
+		await title.fill('Greetings');
 		await expect(page.getByText('13/500')).toBeVisible();
+		await expect(page.getByText('9/80')).toBeVisible();
 		await post.click();
-		await expect(article(page, 'Hello kitchen')).toBeVisible();
+		const posted = article(page, 'Hello kitchen');
+		await expect(posted).toBeVisible();
+		await expect(posted.getByRole('heading', { level: 2, name: 'Greetings' })).toBeVisible();
 		await expect(box).toHaveValue('');
+		await expect(title).toHaveValue('');
+	});
+
+	test('the title field is labelled, limited to 80 characters and tied to its counter', async ({
+		page
+	}) => {
+		const me = await mkUser('f-me');
+		await signIn(page, me);
+		await page.goto('/feed');
+		const title = page.getByLabel('Title', { exact: true });
+		await expect(title).toHaveAttribute('maxlength', '80');
+		await expect(title).toHaveAttribute('autocomplete', 'off');
+		await expect(title).toHaveAttribute('aria-required', 'true');
+		const ids = ((await title.getAttribute('aria-describedby')) ?? '').split(/\s+/);
+		expect(ids).toContain('compose-title-count');
+		// Above the text area.
+		const tBox = await title.boundingBox();
+		const bBox = await page.getByLabel('Share something with the kitchen').boundingBox();
+		expect(tBox!.y).toBeLessThan(bBox!.y);
+		await expectNoOverflow(page);
+	});
+
+	test('a missing title shows an inline error tied to the field (with JavaScript)', async ({
+		page
+	}) => {
+		const me = await mkUser('f-me');
+		await signIn(page, me);
+		await page.goto('/feed');
+		// The button is disabled for an empty title; submit programmatically so the server answers.
+		const form = page.locator('form.compose');
+		await page.getByLabel('Share something with the kitchen').fill('x');
+		await form.evaluate((f: HTMLFormElement) => f.requestSubmit());
+		const alert = page.locator('#compose-title-error');
+		await expect(alert).toHaveText('Title cannot be empty');
+		const title = page.getByLabel('Title', { exact: true });
+		await expect(title).toHaveAttribute('aria-invalid', 'true');
+		await expect(title).toHaveAttribute('aria-describedby', /compose-title-error/);
+		await expect(page.getByLabel('Share something with the kitchen')).toHaveValue('x');
 	});
 
 	test('a post over 500 characters shows an inline error tied to the field', async ({ page }) => {
@@ -622,6 +669,7 @@ test.describe('feed', () => {
 		const box = page.getByLabel('Share something with the kitchen');
 		await box.evaluate((e: HTMLTextAreaElement) => e.removeAttribute('maxlength'));
 		await box.fill('x'.repeat(501));
+		await page.getByLabel('Title', { exact: true }).fill('Long one');
 		await page.getByRole('button', { name: 'Post', exact: true }).click();
 		const alert = page.locator('form').getByRole('alert');
 		await expect(alert).toBeVisible();
@@ -629,6 +677,23 @@ test.describe('feed', () => {
 		expect(id).toBeTruthy();
 		await expect(box).toHaveAttribute('aria-describedby', new RegExp(id!));
 		await expect(box).toHaveAttribute('aria-invalid', 'true');
+	});
+
+	test('a title over 80 characters is rejected inline and both fields are kept', async ({
+		page
+	}) => {
+		const me = await mkUser('f-me');
+		await signIn(page, me);
+		await page.goto('/feed');
+		await page.getByLabel('Title', { exact: true }).evaluate((e: HTMLInputElement) => e.removeAttribute('maxlength'));
+		await page.getByLabel('Title', { exact: true }).fill('t'.repeat(81));
+		await page.getByLabel('Share something with the kitchen').fill('Body stays');
+		await page.getByRole('button', { name: 'Post', exact: true }).click();
+		await expect(page.locator('#compose-title-error')).toHaveText(
+			'Title is too long (80 characters max)'
+		);
+		await expect(page.getByLabel('Title', { exact: true })).toHaveValue('t'.repeat(81));
+		await expect(page.getByLabel('Share something with the kitchen')).toHaveValue('Body stays');
 	});
 
 	test.describe('without JavaScript', () => {
@@ -639,12 +704,29 @@ test.describe('feed', () => {
 			await signIn(page, me);
 			await page.goto('/feed');
 			await page.getByRole('button', { name: 'Post', exact: true }).click();
-			const alert = page.locator('form').getByRole('alert');
-			await expect(alert).toBeVisible();
+			const titleAlert = page.locator('#compose-title-error');
+			const bodyAlert = page.locator('#compose-error');
+			await expect(titleAlert).toHaveText('Title cannot be empty');
+			await expect(bodyAlert).toBeVisible();
+			await expect(page.getByLabel('Title', { exact: true })).toHaveAttribute(
+				'aria-describedby',
+				/compose-title-error/
+			);
 			await expect(page.getByLabel('Share something with the kitchen')).toHaveAttribute(
 				'aria-describedby',
-				new RegExp((await alert.getAttribute('id'))!)
+				/compose-error/
 			);
+		});
+
+		test('a valid title and body post works', async ({ page }) => {
+			const me = await mkUser('f-me');
+			await signIn(page, me);
+			await page.goto('/feed');
+			await page.getByLabel('Title', { exact: true }).fill('Plain title');
+			await page.getByLabel('Share something with the kitchen').fill('Plain body');
+			await page.getByRole('button', { name: 'Post', exact: true }).click();
+			const posted = article(page, 'Plain body');
+			await expect(posted.getByRole('heading', { level: 2, name: 'Plain title' })).toBeVisible();
 		});
 
 		test('a plain post works and Load more pages through the feed', async ({ page }) => {
@@ -719,7 +801,7 @@ test.describe('feed', () => {
 		test('posts, chips and compose keep WCAG AA contrast', async ({ page }) => {
 			const me = await mkUser('f-me');
 			const other = await mkUser('f-other');
-			const p = await mkPost(other.id, 'Dark mode contrast check');
+			const p = await mkPost(other.id, 'Dark mode contrast check', { title: 'Contrast title' });
 			await db.insert(schema.reactions).values({ postId: p.id, userId: me.id, emoji: '❤️' });
 			await signIn(page, me);
 			await page.goto('/feed');
@@ -757,6 +839,7 @@ test.describe('screenshots', () => {
 			const file = await writeProof();
 			const now = Date.now();
 			const p1 = await mkPost(users[0].id, 'Lena just did: Descale the coffee machine! 🎉', {
+				title: 'Descaled the coffee machine',
 				milestone: true,
 				imagePath: file,
 				createdAt: new Date(now - 18 * 60_000)

@@ -456,14 +456,17 @@ test.describe('moderation', () => {
 		const b = await mkUser('mod');
 		const [post] = await db
 			.insert(schema.posts)
-			.values({ userId: a.id, body: 'Please remove this post', imagePath: await writeProof() })
+			.values({ userId: a.id, title: 'Remove me', body: 'Please remove this post', imagePath: await writeProof() })
 			.returning();
-		const [keep] = await db.insert(schema.posts).values({ userId: b.id, body: 'A fine post' }).returning();
+		const [keep] = await db.insert(schema.posts).values({ userId: b.id, title: 'Fine title', body: 'A fine post' }).returning();
 		await db.insert(schema.comments).values({ postId: keep.id, userId: a.id, body: 'A rude comment' });
 
 		await page.goto('/admin/moderation');
 		const art = page.getByRole('article').filter({ hasText: 'Please remove this post' });
 		await expect(art.getByText(a.username)).toBeVisible();
+		const heading = art.getByText('Remove me', { exact: true });
+		await expect(heading).toBeVisible();
+		expect(await heading.evaluate((e) => getComputedStyle(e).fontWeight)).toBe('700');
 		await expect(art.getByRole('img')).toBeVisible();
 		expect(await overflow(page)).toEqual([]);
 
@@ -481,7 +484,8 @@ test.describe('moderation', () => {
 		await art.getByText('Delete post', { exact: true }).click();
 		await art.getByRole('button', { name: 'Delete post permanently' }).click();
 		expect(await db.select().from(schema.posts).where(eq(schema.posts.id, post.id))).toHaveLength(1);
-		await art.getByLabel('Confirm: delete this post').check();
+		await expect(art.getByLabel('Confirm: delete the post \u201cRemove me\u201d')).toBeVisible();
+		await art.getByLabel('Confirm: delete the post').check();
 		await art.getByRole('button', { name: 'Delete post permanently' }).click();
 		await expect(page.getByRole('status').filter({ hasText: 'Deleted the post.' })).toBeVisible();
 		expect(await db.select().from(schema.posts).where(eq(schema.posts.id, post.id))).toHaveLength(0);
@@ -493,6 +497,7 @@ test.describe('moderation', () => {
 		await db.insert(schema.posts).values(
 			Array.from({ length: 21 }, (_, i) => ({
 				userId: a.id,
+				title: `Title ${i}`,
 				body: `post number ${i}`,
 				createdAt: new Date(now - i * 60_000)
 			}))
