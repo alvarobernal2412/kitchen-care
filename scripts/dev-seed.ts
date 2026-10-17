@@ -153,12 +153,17 @@ async function seed(db: Db): Promise<void> {
 	const [admin] = await db.select({ id: users.id }).from(users).where(eq(users.usernameNormalized, ADMIN_USERNAME));
 	const ids = new Map<string, number>();
 	for (const m of MEMBERS) {
-		const u = await signUp(db, {
-			username: m.username,
-			password: MEMBER_PASSWORD,
-			classification: m.classification,
-			department: m.department
-		});
+		// A `now` past the welcome-bonus deadline keeps the documented demo points exact.
+		const u = await signUp(
+			db,
+			{
+				username: m.username,
+				password: MEMBER_PASSWORD,
+				classification: m.classification,
+				department: m.department
+			},
+			{ now: new Date('2999-01-01T00:00:00Z') }
+		);
 		await db.update(users).set({ displayUsername: m.name, onboardingCompleted: true }).where(eq(users.id, u.id));
 		ids.set(m.username, u.id);
 	}

@@ -6,6 +6,7 @@ import postgres from 'postgres';
 import * as schema from '../../src/lib/server/db/schema';
 import { login, SESSION_COOKIE } from '../../src/lib/server/auth/session';
 import { signUp as signUpService } from '../../src/lib/server/auth/users';
+import { grantWelcomeBonus } from '../../src/lib/server/welcomeBonus';
 import { ADMIN_PASSWORD, ADMIN_USERNAME, E2E_ORIGIN, TEST_PASSWORD, e2eDatabaseUrl } from './env';
 
 // Short idle timeout so the worker process can exit without an explicit close.
@@ -36,11 +37,25 @@ export async function createUser(
 	username = uniqueUsername(),
 	{ onboarded = true }: { onboarded?: boolean } = {}
 ): Promise<{ username: string; password: string }> {
-	const user = await signUpService(db, { username, password: TEST_PASSWORD, classification: 'Student' });
+	// `now` far past the welcome-bonus deadline: this helper arranges plain accounts, never a bonus.
+	const user = await signUpService(
+		db,
+		{ username, password: TEST_PASSWORD, classification: 'Student' },
+		{ now: new Date('2999-01-01T00:00:00Z') }
+	);
 	if (onboarded) {
 		await db.update(schema.users).set({ onboardingCompleted: true }).where(eq(schema.users.id, user.id));
 	}
 	return { username, password: TEST_PASSWORD };
+}
+
+/**
+ * Credits the welcome bonus to an existing user through the service function (the web server runs
+ * with the signup offer off, see playwright.config.ts). Resolves to whether it was granted.
+ */
+export async function grantBonusTo(username: string): Promise<boolean> {
+	const user = await getUser(username);
+	return db.transaction((tx) => grantWelcomeBonus(tx, user.id, new Date()));
 }
 
 /** Starts a real session in the database and gives the browser context its cookie. */
