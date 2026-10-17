@@ -3,7 +3,8 @@
 Good karma pays out: rack up your credits for this semester's grand reward.
 
 A small web app for a shared office kitchen. People log chores (dishwasher, coffee grounds,
-cutlery, restocking, descaling...) to earn credits, admins approve the photo-backed ones, and a
+cutlery, restocking, descaling...) to earn credits, admins approve the photo-backed ones (beans,
+milk, coffee grounds, descaling, deep clean), and a
 leaderboard decides the semester prize. SvelteKit 2, Drizzle, Postgres, sharp.
 
 ## Setup
@@ -22,6 +23,16 @@ An account created through sign-up before 20 November 2026 (00:00 Europe/Zurich)
 bonus of 10 credits, but only if a period is active at that moment. It counts like any approved
 credit and shows as "Welcome bonus" in the user's own submissions only. Existing accounts never
 get it. `WELCOME_BONUS_UNTIL` (ISO-8601 with offset, see `.env.example`) moves or disables the cutoff.
+
+## Coffee grounds and removing points
+
+Taking the coffee grounds to the 2nd basement is a reviewed photo chore: a live camera photo, approved
+by an admin (+3), at most once per 24 hours (a pending or approved photo starts the wait; a rejected
+or removed one does not). The dishwasher stays self-reported. Admins can undo a wrong check in
+**Admin > Activity**: it lists the approved chores of the running period (filter by person or chore)
+and each has "Remove points" with a required reason and a confirmation. The chore then counts
+nowhere, its owner sees "Removed by admin: <reason>" and can log it again; a milestone's feed post
+is deleted. Periods that have ended are final and cannot be changed.
 
 ## Try it locally
 
@@ -43,11 +54,13 @@ that local database, removes the uploads it wrote and creates the demo data agai
 
 Things to try:
 
-1. Log a chore (dishwasher, grounds) and watch the credit count-up.
-2. See the cooldown fill on the chore tiles (as `demo`, three are partly through their cooldown).
-3. Submit a photo task (beans, milk) with the camera or a file.
+1. Log the dishwasher and watch the credit count-up.
+2. See the cooldown fill on the chore tiles (as `demo`, three are partly through their cooldown,
+   one of them the approved coffee grounds photo).
+3. Submit a photo task (beans, milk, coffee grounds) with the camera or a file.
 4. Run the cutlery check.
-5. As admin, approve the descaling in Review and find the milestone post in the feed.
+5. As admin, approve the descaling in Review and find the milestone post in the feed; remove a
+   chore's points in Activity and look at the member's Home.
 6. Use the leaderboard filters (Students, Employees, department); first place is a tie.
 7. Collapse the sidebar at laptop width.
 8. Install the app as a PWA (production build: `npm run build && npm run preview`).

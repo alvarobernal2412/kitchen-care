@@ -133,6 +133,16 @@ bonus off. Change it in `.env` and redeploy.
 back. Migrations are not reverted, so keep them backward compatible with the previous release. To
 go further back, deploy one of the three newest kept tags with `deploy/deploy.sh <tag>`.
 
+The release that makes coffee grounds a reviewed photo chore and adds the admin "Activity" page
+ships two migrations, applied by the next deploy: one changes the `grounds` task row (photo and
+review required) and one adds the `revoked` submission status with its audit columns. Both are
+additive, and rolling back to the previous colour keeps points correct: the older code only sums
+`approved` rows, so removed chores stay out of every total. What the older code does not know:
+a removed chore shows to its owner as "Rejected" instead of "Removed by admin", it still counts
+for the cooldown of that chore (the person cannot log it again until it runs out), and grounds
+photos have no once-a-day limit there. Removed chores are kept, not deleted, so rolling forward
+again restores the right behaviour.
+
 ## Backups and restore
 
 `deploy/backup.sh` writes `kitchen-<stamp>.dump` (pg_dump custom format) to `BACKUP_DIR` (default
