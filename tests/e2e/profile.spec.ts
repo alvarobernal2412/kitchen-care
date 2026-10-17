@@ -1,7 +1,7 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import sharp from 'sharp';
 import { E2E_ORIGIN } from './env';
-import { createUser, getUser, giveSession, loginAsNewUser } from './helpers';
+import { createUser, getUser, giveSession, loginAsNewUser, overflowReport, uniqueUsername } from './helpers';
 
 const NEW_PASSWORD = 'Brand-New-Pass9#';
 
@@ -24,19 +24,19 @@ test('changing the password signs out other devices but keeps this one', async (
 	await expect(otherPage).toHaveURL(`${E2E_ORIGIN}/`);
 
 	await page.goto('/profile');
-	await page.getByLabel('Current password').fill('Wrong-Pass-1!');
+	await page.getByRole('region', { name: 'Password' }).getByLabel('Current password').fill('Wrong-Pass-1!');
 	await page.getByLabel('New password', { exact: true }).fill(NEW_PASSWORD);
 	await page.getByLabel('Confirm new password').fill(NEW_PASSWORD);
 	await page.getByRole('button', { name: 'Change password' }).click();
 	await expect(page.getByRole('alert')).toContainText('Current password is incorrect');
 
-	await page.getByLabel('Current password').fill(password);
+	await page.getByRole('region', { name: 'Password' }).getByLabel('Current password').fill(password);
 	await page.getByLabel('New password', { exact: true }).fill(NEW_PASSWORD);
 	await page.getByLabel('Confirm new password').fill('Different-Pass-1!');
 	await page.getByRole('button', { name: 'Change password' }).click();
 	await expect(page.getByRole('alert')).toContainText('do not match');
 
-	await page.getByLabel('Current password').fill(password);
+	await page.getByRole('region', { name: 'Password' }).getByLabel('Current password').fill(password);
 	await page.getByLabel('New password', { exact: true }).fill(NEW_PASSWORD);
 	await page.getByLabel('Confirm new password').fill(NEW_PASSWORD);
 	await page.getByRole('button', { name: 'Change password' }).click();
@@ -138,4 +138,105 @@ test('a non-image upload is rejected with a message and no avatar is set', async
 	});
 	await expect(page.getByRole('status')).toContainText('Could not read that image');
 	expect((await getUser(username)).avatarPath).toBeNull();
+});
+
+const usernameForm = (page: Page) => page.getByRole('region', { name: 'Username' });
+
+test.describe('changing the username', () => {
+	test('shows the new name in the sidebar and on the leaderboard', async ({ page }) => {
+		const { username, password } = await loginAsNewUser(page);
+		const logged = await page.request.post('/api/tasks/dishwasher', {
+			headers: { origin: E2E_ORIGIN }
+		});
+		expect(logged.ok()).toBe(true);
+		const next = uniqueUsername('Renamed');
+		await page.goto('/profile');
+		const form = usernameForm(page);
+		await expect(form.getByLabel('Username')).toHaveValue(username);
+		await form.getByLabel('Username').fill(next);
+		await form.getByLabel('Current password').fill(password);
+		await form.getByRole('button', { name: 'Change username' }).click();
+		const ok = page.getByRole('status').filter({ hasText: 'Username changed to' });
+		await expect(ok).toHaveText(`Username changed to ${next}.`);
+		await expect(ok).toHaveAttribute('aria-live', 'polite');
+		await expect(page.locator('.who-name')).toHaveText(next);
+		await expect(page.getByRole('main').locator('.name')).toHaveText(next);
+		await page.goto('/leaderboard');
+		await expect(page.getByRole('listitem').filter({ hasText: next }).first()).toBeVisible();
+		await expect(page.getByText(username, { exact: true })).toHaveCount(0);
+	});
+
+	test('a taken name shows an error tied to the field', async ({ page }) => {
+		const { password } = await loginAsNewUser(page);
+		const other = await createUser();
+		await page.goto('/profile');
+		const form = usernameForm(page);
+		const input = form.getByLabel('Username');
+		await input.fill(other.username.toUpperCase());
+		await form.getByLabel('Current password').fill(password);
+		await form.getByRole('button', { name: 'Change username' }).click();
+		const alert = form.getByRole('alert');
+		await expect(alert).toHaveText('That username is taken.');
+		await expect(input).toHaveAttribute('aria-invalid', 'true');
+		const id = await input.getAttribute('aria-describedby');
+		expect(id).toBeTruthy();
+		await expect(page.locator(`[id="${id}"]`)).toHaveText('That username is taken.');
+		await expect(input).toHaveValue(other.username.toUpperCase());
+	});
+
+	test('a wrong current password is rejected and the name stays', async ({ page }) => {
+		const { username } = await loginAsNewUser(page);
+		await page.goto('/profile');
+		const form = usernameForm(page);
+		await form.getByLabel('Username').fill(uniqueUsername('nope'));
+		const pw = form.getByLabel('Current password');
+		await pw.fill('Wrong-Pass-1!');
+		await form.getByRole('button', { name: 'Change username' }).click();
+		await expect(form.getByRole('alert')).toHaveText('Current password is incorrect.');
+		await expect(pw).toHaveAttribute('aria-invalid', 'true');
+		await expect(pw).toHaveValue('');
+		expect((await getUser(username)).displayUsername).toBe(username);
+	});
+
+	test.describe('without JavaScript', () => {
+		test.use({ javaScriptEnabled: false });
+
+		test('submitting renames and reports success', async ({ page }) => {
+			const { password } = await loginAsNewUser(page);
+			const next = uniqueUsername('nojs');
+			await page.goto('/profile');
+			const form = usernameForm(page);
+			await form.getByLabel('Username').fill(next);
+			await form.getByLabel('Current password').fill(password);
+			await form.getByRole('button', { name: 'Change username' }).click();
+			await expect(page.getByRole('status').filter({ hasText: 'Username changed to' })).toHaveText(
+				`Username changed to ${next}.`
+			);
+			await expect(page.locator('.who-name')).toHaveText(next);
+			expect((await getUser(next)).displayUsername).toBe(next);
+		});
+
+		test('a bad name is reported inline and the typed name is kept', async ({ page }) => {
+			const { password } = await loginAsNewUser(page);
+			await page.goto('/profile');
+			const form = usernameForm(page);
+			await form.getByLabel('Username').fill('no spaces');
+			await form.getByLabel('Current password').fill(password);
+			await form.getByRole('button', { name: 'Change username' }).click();
+			await expect(form.getByRole('alert')).toContainText('3-32 characters');
+			await expect(form.getByLabel('Username')).toHaveValue('no spaces');
+		});
+	});
+
+	test('has no horizontal overflow at 390x844', async ({ page }) => {
+		await loginAsNewUser(page);
+		await page.setViewportSize({ width: 390, height: 844 });
+		await page.goto('/profile');
+		const form = usernameForm(page);
+		await form.getByLabel('Username').fill('x'.repeat(32));
+		await form.getByLabel('Current password').fill('wrong-pass');
+		await form.getByRole('button', { name: 'Change username' }).click();
+		await expect(form.getByRole('alert')).toBeVisible();
+		expect(await overflowReport(page)).toEqual([]);
+	});
 });

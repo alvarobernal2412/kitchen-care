@@ -14,6 +14,10 @@
 	const current = $derived(avatarUrl(data.profile.avatarPath));
 
 	let newPassword = $state('');
+	let nameBusy = $state(false);
+	// svelte-ignore state_referenced_locally
+	let usernameDraft = $state(form?.username ?? data.profile.username);
+	const nameErrorField = $derived(form?.usernameError ? form.usernameField : null);
 	let pwBusy = $state(false);
 
 	let blob = $state.raw<Blob | null>(null);
@@ -154,6 +158,74 @@
 				{avatarMessage?.text ?? ''}
 			</p>
 		</div>
+	</section>
+
+	<section aria-labelledby="username-h">
+		<h2 id="username-h">Username</h2>
+		<p class="note">Your username is {data.profile.username}.</p>
+		<form
+			method="POST"
+			action="?/username"
+			use:enhance={() => {
+				nameBusy = true;
+				return async ({ result, update }) => {
+					await update({ reset: false });
+					if (result.type === 'redirect') usernameDraft = data.profile.username;
+					const pw = document.getElementById('usernamePassword') as HTMLInputElement | null;
+					if (pw) pw.value = '';
+					nameBusy = false;
+				};
+			}}
+		>
+			<div class="field">
+				<label class="label" for="username">Username</label>
+				<input
+					id="username"
+					class="input"
+					type="text"
+					name="username"
+					autocomplete="username"
+					autocapitalize="none"
+					spellcheck="false"
+					required
+					minlength="3"
+					maxlength="32"
+					bind:value={usernameDraft}
+					aria-invalid={nameErrorField === 'username' ? 'true' : undefined}
+					aria-describedby={nameErrorField === 'username' ? 'username-error' : undefined}
+				/>
+				{#if nameErrorField === 'username'}
+					<p id="username-error" class="error" role="alert">{form?.usernameError}</p>
+				{/if}
+			</div>
+			<div class="field">
+				<label class="label" for="usernamePassword">Current password</label>
+				<input
+					id="usernamePassword"
+					class="input"
+					type="password"
+					name="currentPassword"
+					autocomplete="current-password"
+					required
+					aria-invalid={nameErrorField === 'password' ? 'true' : undefined}
+					aria-describedby={nameErrorField === 'password' ? 'username-pw-error' : undefined}
+				/>
+				{#if nameErrorField === 'password'}
+					<p id="username-pw-error" class="error" role="alert">{form?.usernameError}</p>
+				{/if}
+			</div>
+			{#if form?.usernameError && !nameErrorField}
+				<p class="error" role="alert">{form.usernameError}</p>
+			{/if}
+			{#if data.renamed && !form?.usernameError}
+				<p class="note ok" role="status" aria-live="polite">
+					Username changed to {data.profile.username}.
+				</p>
+			{/if}
+			<button type="submit" class="btn btn-primary btn-block" disabled={nameBusy} aria-busy={nameBusy}>
+				Change username
+			</button>
+		</form>
 	</section>
 
 	<section aria-labelledby="password-h">

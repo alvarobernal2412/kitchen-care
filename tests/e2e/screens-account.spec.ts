@@ -479,7 +479,7 @@ test.describe('reset password', () => {
 });
 
 test.describe('profile', () => {
-	test('shows the identity, a Photo and a Password section, one h1', async ({ page }) => {
+	test('shows the identity, a Photo, a Username and a Password section, one h1', async ({ page }) => {
 		await signedIn(page);
 		await page.goto('/profile');
 		await expect(h1(page)).toHaveCount(1);
@@ -548,7 +548,7 @@ test.describe('profile', () => {
 	}) => {
 		const { password } = await signedIn(page);
 		await page.goto('/profile');
-		const current = page.getByLabel('Current password');
+		const current = page.getByRole('region', { name: 'Password' }).getByLabel('Current password');
 		const next = page.getByLabel('New password', { exact: true });
 		const confirm = page.getByLabel('Confirm new password');
 

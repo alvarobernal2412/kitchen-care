@@ -62,7 +62,7 @@ test('an enhanced form action after the session expired lands on /login without 
 	await page.goto('/profile');
 	await dropSessions(username);
 
-	await page.getByLabel('Current password').fill(password);
+	await page.getByRole('region', { name: 'Password' }).getByLabel('Current password').fill(password);
 	await page.getByLabel('New password', { exact: true }).fill('Brand-New-Pass9#');
 	await page.getByLabel('Confirm new password').fill('Brand-New-Pass9#');
 	await page.getByRole('button', { name: 'Change password' }).click();
