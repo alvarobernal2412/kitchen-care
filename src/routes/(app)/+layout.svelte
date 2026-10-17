@@ -53,20 +53,4 @@
 	.skip-link:focus {
 		transform: none;
 	}
-	/* Default for bare <button>s (e.g. the camera overlay); restyled screens use .btn classes. */
-	:global(button) {
-		width: 100%;
-		padding: 0.8rem;
-		font: inherit;
-		font-weight: 600;
-		color: var(--on-accent);
-		background: var(--accent);
-		border: 0;
-		border-radius: 8px;
-		cursor: pointer;
-	}
-	:global(button:disabled) {
-		opacity: 0.6;
-		cursor: not-allowed;
-	}
 </style>
