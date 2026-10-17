@@ -9,6 +9,21 @@
 	let { data, form } = $props();
 
 	let copied = $state<number | null>(null);
+	let copyFailed = $state<number | null>(null);
+	// A new link starts without the previous "Copied" or failure message.
+	$effect(() => {
+		void form?.resetUrl;
+		copied = null;
+		copyFailed = null;
+	});
+
+	function selectAll(el: HTMLElement) {
+		const range = document.createRange();
+		range.selectNodeContents(el);
+		const sel = getSelection();
+		sel?.removeAllRanges();
+		sel?.addRange(range);
+	}
 
 	// The result is shown on the row, so the actions fold away once one has been sent.
 	const closing: SubmitFunction = () => async ({ formElement, update }) => {
@@ -20,8 +35,10 @@
 		try {
 			await navigator.clipboard.writeText(text);
 			copied = userId;
+			copyFailed = null;
 		} catch {
-			copied = null; // the link stays selectable for a manual copy
+			copied = null;
+			copyFailed = userId; // the link stays selectable for a manual copy
 		}
 	}
 </script>
@@ -86,12 +103,24 @@
 					{#if mine && form?.resetUrl}
 						<div class="reset" role="status">
 							<p class="label">Reset link for {u.username} (shown once)</p>
-							<code class="reset-url">{form.resetUrl}</code>
+							<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+							<code
+								class="reset-url"
+								tabindex="0"
+								onfocus={(e) => selectAll(e.currentTarget)}
+								>{form.resetUrl}</code
+							>
 							<div class="cluster">
 								<button type="button" class="btn btn-primary" onclick={() => copy(u.id, form.resetUrl)}
 									>Copy link</button
 								>
-								<span class="copied" aria-live="polite">{copied === u.id ? 'Copied' : ''}</span>
+								<span class="copied" aria-live="polite"
+									>{copied === u.id
+										? 'Copied'
+										: copyFailed === u.id
+											? "Couldn't copy. Select the link and copy it."
+											: ''}</span
+								>
 							</div>
 							<p class="help">
 								Valid for 1 hour, single use. Share it only with the verified user. It will not be
