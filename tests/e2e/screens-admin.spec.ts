@@ -40,7 +40,7 @@ test.afterEach(async () => {
 		await db.delete(schema.periodWinners).where(inArray(schema.periodWinners.userId, ids));
 		await db.delete(schema.submissions).where(inArray(schema.submissions.userId, ids));
 		await db.delete(schema.events).where(inArray(schema.events.userId, ids));
-		// the admin changes made to these users may have left sessions behind
+		// reset links generated for these users
 		await db.delete(schema.resetTokens).where(inArray(schema.resetTokens.userId, ids));
 	}
 	for (const id of periodIds.splice(0)) {
@@ -417,6 +417,31 @@ test.describe('users', () => {
 	});
 });
 
+test.describe('users: copy failure', () => {
+	test('a refused clipboard says so and the link stays selectable by keyboard', async ({ page }) => {
+		await page.addInitScript(() => {
+			Object.defineProperty(navigator, 'clipboard', {
+				value: { writeText: () => Promise.reject(new Error('denied')) },
+				configurable: true
+			});
+		});
+		const u = await mkUser('rstfail');
+		await loginAsAdmin(page);
+		await page.goto(`/admin/users?q=${u.username}`);
+		const r = page.getByRole('listitem').filter({ hasText: u.username });
+		await r.locator('summary').click();
+		await r.getByRole('button', { name: 'Generate reset link' }).click();
+		const panel = r.getByRole('status').filter({ hasText: 'Reset link for' });
+		await panel.getByRole('button', { name: 'Copy link' }).click();
+		await expect(panel.getByText("Couldn't copy. Select the link and copy it.")).toBeVisible();
+		await expect(panel.getByText('Copied', { exact: true })).toHaveCount(0);
+		const url = panel.locator('.reset-url');
+		await expect(url).toHaveAttribute('tabindex', '0');
+		await url.focus();
+		expect(await page.evaluate(() => getSelection()!.toString())).toContain('reset-password?token=');
+	});
+});
+
 // ---------------------------------------------------------------------------------------------
 // Moderation
 // ---------------------------------------------------------------------------------------------
@@ -746,6 +771,28 @@ test.describe('analytics', () => {
 		await expect(page.getByText(/\(max\)/)).toBeVisible();
 	});
 
+	test('five-digit figures stay inside their columns at 360 px', async ({ page }) => {
+		await page.setViewportSize(SMALL);
+		const u = await mkUser('big');
+		const now = Date.now();
+		const rows = (type: string, n: number) =>
+			Array.from({ length: n }, (_, i) => ({ userId: u.id, type, createdAt: new Date(now - (i % 600) * 60_000) }));
+		for (let i = 0; i < 12; i++) await db.insert(schema.events).values(rows('app_open', 1000));
+		for (let i = 0; i < 11; i++) await db.insert(schema.events).values(rows('task_submitted', 1000));
+		await loginAsAdmin(page);
+		await page.goto('/admin/analytics?range=7d');
+		const figs = page.locator('.stats dd');
+		await expect(figs).toHaveCount(3);
+		await expect(figs.first()).toContainText(/\d{2},\d{3}/);
+		expect(await overflow(page)).toEqual([]);
+		const boxes = await figs.evaluateAll((els) =>
+			els.map((e) => ({ r: e.getBoundingClientRect(), over: e.scrollWidth > e.clientWidth }))
+		);
+		for (let i = 0; i < 3; i++) expect(boxes[i].over).toBe(false);
+		expect(boxes[0].r.right).toBeLessThanOrEqual(boxes[1].r.left);
+		expect(boxes[1].r.right).toBeLessThanOrEqual(boxes[2].r.left);
+	});
+
 	test('360 px wide: no horizontal page overflow', async ({ page }) => {
 		await page.setViewportSize(SMALL);
 		const u = await mkUser('an');
@@ -910,7 +957,13 @@ test.describe('camera overlay', () => {
 		const banner = dialog.getByRole('alert');
 		await expect(banner).toBeVisible({ timeout: 90_000 });
 		// Needs the model download; without network the other banner shows and this check does not apply.
-		test.skip((await banner.innerText()).startsWith("Couldn't check"), 'cutlery model not reachable');
+		const unreachable = (await banner.innerText()).startsWith("Couldn't check");
+		if (unreachable) {
+			console.warn('cutlery model download unreachable: skipping the "No cutlery detected" check');
+			// CI has network: a missing model there is a real failure, not a reason to skip.
+			if (process.env.CI) throw new Error('cutlery model download unreachable in CI');
+		}
+		test.skip(unreachable, 'model download unreachable');
 		await expect(banner).toHaveText('No cutlery detected, retake');
 		await expect(banner.locator('svg')).toHaveCount(1);
 	});
