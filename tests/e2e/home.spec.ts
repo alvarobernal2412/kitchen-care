@@ -182,9 +182,9 @@ test.describe('home on a phone', () => {
 		await expect(tile(page, 'milk')).toContainText('Photo + review');
 		await expect(tile(page, 'beans')).toContainText('Waiting for review');
 		await expect(tile(page, 'dishwasher')).toContainText(/Ready in \d+ (min|h)/);
-		const dish = page.getByRole('button', { name: /Empty or run dishwasher, plus 2 credits, ready in/ });
+		const dish = page.getByRole('button', { name: /^\+2 Empty or run dishwasher Ready in/ });
 		await expect(dish).toHaveAttribute('aria-disabled', 'true');
-		await expect(page.getByRole('button', { name: /Take coffee grounds.*, plus 3 credits, tap to log/ })).toBeEnabled();
+		await expect(page.getByRole('button', { name: /^\+3 Take coffee grounds.* Tap to log/ })).toBeEnabled();
 	});
 
 	test('cooldown fill reflects the elapsed share of the cooldown', async ({ page }) => {

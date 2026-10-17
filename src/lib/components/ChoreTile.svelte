@@ -18,19 +18,6 @@
 		return m === 0 ? `Ready in ${h} h` : `Ready in ${h} h ${m} min`;
 	}
 
-	/** Spoken version, minute precision so the accessible name changes once a minute, not every second. */
-	export function readyInSpoken(seconds: number): string {
-		if (seconds < 60) return 'ready in less than a minute';
-		const totalMin = Math.ceil(seconds / 60);
-		const h = Math.floor(totalMin / 60);
-		const m = totalMin % 60;
-		const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`;
-		if (h === 0) return `ready in ${plural(m, 'minute')}`;
-		return m === 0
-			? `ready in ${plural(h, 'hour')}`
-			: `ready in ${plural(h, 'hour')} ${plural(m, 'minute')}`;
-	}
-
 	/** Share (0..1) of the cooldown that has already elapsed. */
 	export function elapsedShare(remainingMs: number, cooldownSeconds: number): number {
 		if (cooldownSeconds <= 0) return 1;
@@ -92,14 +79,23 @@
 	const inert = $derived(tileState === 'cooldown' || disabled);
 	const showCamera = $derived(tileState === 'photo');
 
+	/** The words shown on the tile under the label (also what the accessible name must contain). */
+	const stateText = $derived.by(() => {
+		if (note) return note;
+		if (tileState === 'cooldown') return readyInText(remainingSec);
+		if (tileState === 'pending') return 'Waiting for review';
+		if (tileState === 'photo') return 'Photo + review';
+		if (task.needsPhoto) return 'Photo check';
+		return 'Tap to log';
+	});
+
+	// Label in Name (WCAG 2.5.3): the name starts with the visible text, in the order it is shown
+	// ("+3 Bring milk Photo + review"); anything extra follows after a comma.
 	const name = $derived.by(() => {
-		const plus = `plus ${task.points} credit${task.points === 1 ? '' : 's'}`;
-		if (tileState === 'cooldown') return `${task.label}, ${plus}, ${readyInSpoken(remainingSec)}`;
+		const visible = `+${task.points} ${task.label} ${stateText}`;
 		if (tileState === 'pending')
-			return `${task.label}, ${plus}, ${pendingCount} waiting for review${disabled ? '' : ', tap to submit another'}`;
-		if (tileState === 'photo') return `${task.label}, ${plus}, photo and review, tap to take a photo`;
-		if (task.needsPhoto) return `${task.label}, ${plus}, photo check, tap to log`;
-		return `${task.label}, ${plus}, tap to log`;
+			return `${visible}, ${pendingCount} waiting${disabled ? '' : ', tap to submit another'}`;
+		return visible;
 	});
 
 	function press() {
@@ -134,19 +130,9 @@
 	<span class="text">
 		<span class="label">{task.label}</span>
 		<span class="state">
-			{#if note}
-				{note}
-			{:else if tileState === 'cooldown'}
-				<IconHourglass size={16} />{readyInText(remainingSec)}
-			{:else if tileState === 'pending'}
-				<IconClock size={16} />Waiting for review
-			{:else if tileState === 'photo'}
-				Photo + review
-			{:else if task.needsPhoto}
-				<IconCamera size={16} />Photo check
-			{:else}
-				Tap to log
-			{/if}
+			{#if !note && tileState === 'cooldown'}<IconHourglass size={16} />
+			{:else if !note && tileState === 'pending'}<IconClock size={16} />
+			{:else if !note && tileState !== 'photo' && task.needsPhoto}<IconCamera size={16} />{/if}{stateText}
 		</span>
 	</span>
 </button>
