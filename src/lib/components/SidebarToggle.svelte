@@ -5,14 +5,20 @@
 	/**
 	 * Collapse/expand button. A real form POST so it works without JavaScript; with JavaScript the
 	 * state flips immediately (`onflip`) and a plain fetch stores the cookie. If that fails the
-	 * flip is rolled back, and a redirect (expired session) goes where the server sent us.
+	 * flip is rolled back, and a redirect (expired session) goes where the server sent us. Clicks
+	 * while a request is pending are ignored, so a quick double click cannot send two requests
+	 * whose rollbacks and responses race each other.
 	 */
 	let { state, onflip }: { state: NavState; onflip: (next: NavState) => void } = $props();
+
+	let pending = false;
 
 	const next = $derived<NavState>(state === 'expanded' ? 'collapsed' : 'expanded');
 
 	async function submit(event: SubmitEvent) {
 		event.preventDefault();
+		if (pending) return;
+		pending = true;
 		const previous = state;
 		const target = next;
 		onflip(target);
@@ -30,6 +36,8 @@
 			if (!res.ok) onflip(previous);
 		} catch {
 			onflip(previous);
+		} finally {
+			pending = false;
 		}
 	}
 </script>

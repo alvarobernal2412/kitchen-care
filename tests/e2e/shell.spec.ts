@@ -359,7 +359,39 @@ test.describe('toggle failures', () => {
 		await page.route('**/preferences/nav', (route) => route.fulfill({ status: 500, body: 'nope' }));
 		await toggle(page).click();
 		await expect(toggle(page)).toHaveAttribute('aria-expanded', 'true');
-		expect(await widthOf(page, '#sidebar')).toBeCloseTo(240, 0);
+		// the width transition back to the expanded rail takes a moment
+		await expect.poll(() => widthOf(page, '#sidebar')).toBeCloseTo(240, 0);
+	});
+
+	test('a double click sends one request and keeps the first flip', async ({ page }) => {
+		await loginAsNewUser(page);
+		await page.goto('/');
+		let posts = 0;
+		await page.route('**/preferences/nav', async (route) => {
+			posts++;
+			await new Promise((r) => setTimeout(r, 400));
+			await route.fulfill({ status: 204 });
+		});
+		await toggle(page).dblclick();
+		await expect(toggle(page)).toHaveAttribute('aria-expanded', 'false');
+		await page.waitForTimeout(700);
+		expect(posts).toBe(1);
+		await expect(toggle(page)).toHaveAttribute('aria-expanded', 'false');
+	});
+
+	test('a failed request after a double click rolls back to the original state', async ({ page }) => {
+		await loginAsNewUser(page);
+		await page.goto('/');
+		let posts = 0;
+		await page.route('**/preferences/nav', async (route) => {
+			posts++;
+			await new Promise((r) => setTimeout(r, 400));
+			await route.fulfill({ status: 500, body: 'nope' });
+		});
+		await toggle(page).dblclick();
+		await page.waitForTimeout(700);
+		expect(posts).toBe(1);
+		await expect(toggle(page)).toHaveAttribute('aria-expanded', 'true');
 	});
 
 	test('an expired session sends the user to /login without a stuck state', async ({ page }) => {
