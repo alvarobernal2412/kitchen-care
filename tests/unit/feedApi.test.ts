@@ -156,7 +156,7 @@ describe('reaction buttons accessibility', () => {
 			expect(reactionLabel(e, 3)).toBe(`${EMOJI_NAMES[e]}, 3 reactions`);
 		}
 		expect(reactionLabel('👏', 1)).toBe('Clap, 1 reaction');
-		expect(reactionLabel('👏', 0)).toBe('Clap, 0 reactions');
+		expect(reactionLabel('👏', 0)).toBe('Clap, no reactions');
 	});
 
 	it('the button in Reactions.svelte sets aria-label from reactionLabel and aria-pressed', async () => {

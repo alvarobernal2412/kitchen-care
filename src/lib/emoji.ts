@@ -9,8 +9,9 @@ export const EMOJI_NAMES: Record<Emoji, string> = {
 	'🙌': 'Praise'
 };
 
-/** Accessible name for a reaction button, e.g. "Clap, 3 reactions". */
+/** Accessible name for a reaction button, e.g. "Clap, 3 reactions" or "Clap, no reactions". */
 export function reactionLabel(emoji: Emoji, count: number): string {
+	if (count <= 0) return `${EMOJI_NAMES[emoji]}, no reactions`;
 	return `${EMOJI_NAMES[emoji]}, ${count} ${count === 1 ? 'reaction' : 'reactions'}`;
 }
 

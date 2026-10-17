@@ -102,7 +102,6 @@
 		transform: scale(0.95);
 	}
 	.react:disabled {
-		opacity: 1;
 		cursor: progress;
 	}
 	.react.on,

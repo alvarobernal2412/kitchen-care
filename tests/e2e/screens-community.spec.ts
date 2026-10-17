@@ -496,7 +496,7 @@ test.describe('feed', () => {
 		await signIn(page, me);
 		await page.goto('/feed');
 		const post = article(page, 'Optimistic reaction post');
-		const clap = post.getByRole('button', { name: 'Clap, 0 reactions' });
+		const clap = post.getByRole('button', { name: 'Clap, no reactions' });
 		await expect(clap).toHaveAttribute('aria-pressed', 'false');
 		await expect(clap.locator('svg')).toHaveCount(0);
 
@@ -516,7 +516,7 @@ test.describe('feed', () => {
 			return { bg: c.backgroundColor, h: e.getBoundingClientRect().height, r: c.borderRadius };
 		});
 		const plain = await post
-			.getByRole('button', { name: 'Love, 0 reactions' })
+			.getByRole('button', { name: 'Love, no reactions' })
 			.evaluate((e) => getComputedStyle(e).backgroundColor);
 		expect(style.bg).not.toBe(plain);
 		expect(style.h).toBeGreaterThanOrEqual(44);
@@ -540,9 +540,9 @@ test.describe('feed', () => {
 			route.fulfill({ status: 500, contentType: 'application/json', body: '{}' })
 		);
 		const post = article(page, 'Rollback post');
-		await post.getByRole('button', { name: 'Love, 0 reactions' }).click();
+		await post.getByRole('button', { name: 'Love, no reactions' }).click();
 		await expect(post.getByRole('alert')).toContainText('Could not save your reaction');
-		const love = post.getByRole('button', { name: 'Love, 0 reactions' });
+		const love = post.getByRole('button', { name: 'Love, no reactions' });
 		await expect(love).toHaveAttribute('aria-pressed', 'false');
 		await expect(love).toBeEnabled();
 	});
