@@ -68,7 +68,7 @@ describe('POST /api/posts/[id]/reactions', () => {
 
 	it('validates id, emoji and existence', async () => {
 		const m = await reactionsRoute();
-		const p = await createPost(t.db, alice.id, { body: 'hi' });
+		const p = await createPost(t.db, alice.id, { title: 'Title', body: 'hi' });
 		expect((await call(m, 'POST', bob, 'abc', { emoji: '👏' })).status).toBe(404);
 		expect((await call(m, 'POST', bob, '999999', { emoji: '👏' })).status).toBe(404);
 		expect((await call(m, 'POST', bob, String(p.id), { emoji: '👍' })).status).toBe(400);
@@ -77,7 +77,7 @@ describe('POST /api/posts/[id]/reactions', () => {
 
 	it('toggles and returns counts + own reactions', async () => {
 		const m = await reactionsRoute();
-		const p = await createPost(t.db, alice.id, { body: 'hi' });
+		const p = await createPost(t.db, alice.id, { title: 'Title', body: 'hi' });
 		const on = await call(m, 'POST', bob, String(p.id), { emoji: '☕' });
 		expect(on.status).toBe(200);
 		expect(on.body.counts['☕']).toBe(1);
@@ -88,7 +88,7 @@ describe('POST /api/posts/[id]/reactions', () => {
 
 	it('rate limits at 60/min', async () => {
 		const m = await reactionsRoute();
-		const p = await createPost(t.db, alice.id, { body: 'hi' });
+		const p = await createPost(t.db, alice.id, { title: 'Title', body: 'hi' });
 		for (let i = 0; i < 60; i++) await call(m, 'POST', bob, String(p.id), { emoji: '👏' });
 		expect((await call(m, 'POST', bob, String(p.id), { emoji: '👏' })).status).toBe(429);
 	});
@@ -103,7 +103,7 @@ describe('comments API', () => {
 
 	it('adds, lists and validates', async () => {
 		const m = await commentsRoute();
-		const p = await createPost(t.db, alice.id, { body: 'hi' });
+		const p = await createPost(t.db, alice.id, { title: 'Title', body: 'hi' });
 		const id = String(p.id);
 		const created = await call(m, 'POST', bob, id, { body: '<b>hey</b>' });
 		expect(created.status).toBe(201);
@@ -119,7 +119,7 @@ describe('comments API', () => {
 
 	it('rate limits comments at 10/min', async () => {
 		const m = await commentsRoute();
-		const p = await createPost(t.db, alice.id, { body: 'hi' });
+		const p = await createPost(t.db, alice.id, { title: 'Title', body: 'hi' });
 		for (let i = 0; i < 10; i++) await call(m, 'POST', bob, String(p.id), { body: 'x' });
 		expect((await call(m, 'POST', bob, String(p.id), { body: 'x' })).status).toBe(429);
 	});
@@ -128,7 +128,7 @@ describe('comments API', () => {
 describe('DELETE endpoints', () => {
 	it('post: 401, 403 for non-author, 404 missing, 200 for author', async () => {
 		const m = await postRoute();
-		const p = await createPost(t.db, alice.id, { body: 'hi' });
+		const p = await createPost(t.db, alice.id, { title: 'Title', body: 'hi' });
 		const id = String(p.id);
 		expect((await call(m, 'DELETE', null, id)).status).toBe(401);
 		expect((await call(m, 'DELETE', bob, id)).status).toBe(403);
@@ -140,7 +140,7 @@ describe('DELETE endpoints', () => {
 	it('comment: 403 for non-author, 200 for author', async () => {
 		const cm = await commentsRoute();
 		const m = await commentRoute();
-		const p = await createPost(t.db, alice.id, { body: 'hi' });
+		const p = await createPost(t.db, alice.id, { title: 'Title', body: 'hi' });
 		const c = await call(cm, 'POST', bob, String(p.id), { body: 'mine' });
 		const id = String(c.body.comment.id);
 		expect((await call(m, 'DELETE', alice, id)).status).toBe(403);
@@ -185,30 +185,66 @@ describe('feed page', () => {
 		return import('../../src/routes/(app)/feed/+page.server');
 	}
 
-	it('post action creates a post, validates, and rate limits at 5/min', async () => {
+	const post = async (fields: { title?: string; body?: string }, user: U = alice) => {
 		const { actions } = await mod();
-		const run = async (body: string, user: U = alice) => {
-			const fd = new FormData();
-			fd.set('body', body);
-			const request = new Request('http://localhost/feed?/post', { method: 'POST', body: fd });
-			return (actions.post as (e: unknown) => Promise<{ status?: number; data?: unknown }>)({
-				request,
-				locals: { user }
-			});
-		};
-		expect(await run('hello')).toEqual({ posted: true });
-		expect((await run('')).status).toBe(400);
-		expect((await run('x'.repeat(501))).status).toBe(400);
-		expect((await run('hi', null)).status).toBe(401);
-		expect((await run('hi', { ...alice, active: false })).status).toBe(403);
+		const fd = new FormData();
+		if (fields.title !== undefined) fd.set('title', fields.title);
+		if (fields.body !== undefined) fd.set('body', fields.body);
+		const request = new Request('http://localhost/feed?/post', { method: 'POST', body: fd });
+		return (actions.post as (e: unknown) => Promise<{ status?: number; data?: Record<string, unknown> }>)({
+			request,
+			locals: { user }
+		});
+	};
+
+	it('post action creates a post, validates, and rate limits at 5/min', async () => {
+		expect(await post({ title: 'Greeting', body: 'hello' })).toEqual({ posted: true });
+		expect((await t.db.select().from(posts))[0]).toMatchObject({ title: 'Greeting', body: 'hello' });
+		expect((await post({ title: 'T', body: '' })).status).toBe(400);
+		expect((await post({ title: 'T', body: 'x'.repeat(501) })).status).toBe(400);
+		expect((await post({ title: 'T', body: 'hi' }, null)).status).toBe(401);
+		expect((await post({ title: 'T', body: 'hi' }, { ...alice, active: false })).status).toBe(403);
 		resetRateLimits();
-		for (let i = 0; i < 5; i++) await run(`p${i}`);
-		expect((await run('too many')).status).toBe(429);
+		for (let i = 0; i < 5; i++) await post({ title: 'T', body: `p${i}` });
+		expect((await post({ title: 'T', body: 'too many' })).status).toBe(429);
+	});
+
+	it('post action reports a missing title and keeps what was typed', async () => {
+		const r = await post({ title: '   ', body: 'some body' });
+		expect(r.status).toBe(400);
+		expect(r.data).toMatchObject({ titleError: 'Title cannot be empty', title: '   ', body: 'some body' });
+		expect(r.data?.bodyError).toBeUndefined();
+		const noField = await post({ body: 'some body' });
+		expect(noField.status).toBe(400);
+		expect(noField.data).toMatchObject({ titleError: 'Title cannot be empty' });
+		expect(await t.db.select().from(posts)).toHaveLength(0);
+	});
+
+	it('post action rejects a title over 80 characters', async () => {
+		const r = await post({ title: 't'.repeat(81), body: 'b' });
+		expect(r.status).toBe(400);
+		expect(r.data).toMatchObject({ titleError: 'Title is too long (80 characters max)', body: 'b' });
+		expect((await post({ title: 't'.repeat(80), body: 'b' })).data).toBeUndefined();
+	});
+
+	it('post action reports both missing fields at once', async () => {
+		const r = await post({ title: '', body: '' });
+		expect(r.status).toBe(400);
+		expect(r.data).toMatchObject({
+			titleError: 'Title cannot be empty',
+			bodyError: 'Post cannot be empty'
+		});
+		expect((await post({})).status).toBe(400);
+	});
+
+	it('invalid submissions do not use up the post rate limit', async () => {
+		for (let i = 0; i < 6; i++) await post({ title: '', body: '' });
+		expect(await post({ title: 'T', body: 'fine' })).toEqual({ posted: true });
 	});
 
 	it('load returns the first page with a cursor and serialisable dates', async () => {
 		const { load } = await mod();
-		for (let i = 0; i < 22; i++) await createPost(t.db, alice.id, { body: `p${i}` });
+		for (let i = 0; i < 22; i++) await createPost(t.db, alice.id, { title: 'Title', body: `p${i}` });
 		const run = (url: string) =>
 			(load as (e: unknown) => Promise<{ posts: { body: string }[]; next: null | { before: string; beforeId: number }; paged: boolean }>)({
 				locals: { user: alice },

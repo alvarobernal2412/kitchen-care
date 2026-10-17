@@ -13,6 +13,7 @@ export type FeedAuthor = {
 export type FeedPost = {
 	id: number;
 	createdAt: string;
+	title: string;
 	body: string;
 	imagePath: string | null;
 	milestone: { taskLabel: string } | null;

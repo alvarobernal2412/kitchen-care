@@ -146,7 +146,7 @@ describe('revokeSubmission', () => {
 		expect(post).toBeDefined();
 		await addComment(t.db, other, post.id, 'nice');
 		await toggleReaction(t.db, other, post.id, '👏');
-		await createPost(t.db, other, { body: 'unrelated' });
+		await createPost(t.db, other, { title: 'Title', body: 'unrelated' });
 
 		await revokeSubmission(t.db, admin, id, 'it was not descaled');
 

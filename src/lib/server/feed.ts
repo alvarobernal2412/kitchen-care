@@ -10,6 +10,7 @@ export { EMOJIS, isEmoji, type Emoji };
 export { InactiveUserError };
 
 export const POST_MAX = 500;
+export const TITLE_MAX = 80;
 export const COMMENT_MAX = 300;
 
 export type Post = typeof posts.$inferSelect;
@@ -55,6 +56,32 @@ function cleanText(raw: string, max: number, what: string): string {
 	return text;
 }
 
+/** Titles are one line: sanitised like any text, with newlines turned into single spaces. */
+function cleanTitle(raw: string): string {
+	return cleanText(sanitizeText(raw).replace(/\s*\n+\s*/g, ' '), TITLE_MAX, 'Title');
+}
+
+/** Field-level problems of a new post (undefined when fine); the compose form shows both at once. */
+export function checkPostFields(input: { title: string; body: string }): {
+	title?: string;
+	body?: string;
+} {
+	const out: { title?: string; body?: string } = {};
+	try {
+		cleanTitle(input.title);
+	} catch (err) {
+		if (!(err instanceof InvalidTextError)) throw err;
+		out.title = err.message;
+	}
+	try {
+		cleanText(input.body, POST_MAX, 'Post');
+	} catch (err) {
+		if (!(err instanceof InvalidTextError)) throw err;
+		out.body = err.message;
+	}
+	return out;
+}
+
 async function assertActive(db: Executor, userId: number): Promise<void> {
 	const [u] = await db.select({ active: users.active }).from(users).where(eq(users.id, userId));
 	if (!u?.active) throw new InactiveUserError();
@@ -65,7 +92,12 @@ async function assertPostExists(db: Executor, postId: number): Promise<void> {
 	if (!p) throw new PostNotFoundError();
 }
 
-export type CreatePostInput = { body: string; imagePath?: string; milestoneSubmissionId?: number };
+export type CreatePostInput = {
+	title: string;
+	body: string;
+	imagePath?: string;
+	milestoneSubmissionId?: number;
+};
 
 /**
  * User posts are text-only (1-500 chars). A post with `milestoneSubmissionId` is a system post:
@@ -80,9 +112,10 @@ export async function createPost(
 		if (input.imagePath !== undefined) {
 			throw new InvalidTextError('Only milestone posts can carry an image');
 		}
+		const title = cleanTitle(input.title);
 		const body = cleanText(input.body, POST_MAX, 'Post');
 		await assertActive(db, authorId);
-		const [row] = await db.insert(posts).values({ userId: authorId, body }).returning();
+		const [row] = await db.insert(posts).values({ userId: authorId, title, body }).returning();
 		return row;
 	}
 
@@ -90,6 +123,7 @@ export async function createPost(
 		.insert(posts)
 		.values({
 			userId: authorId,
+			title: cleanTitle(input.title),
 			body: sanitizeText(input.body),
 			imagePath: input.imagePath ?? null,
 			milestoneSubmissionId: input.milestoneSubmissionId
@@ -105,15 +139,26 @@ export async function createPost(
 	return existing;
 }
 
+/** Headline for a milestone post; chores without a hand-written one use their label. */
+const MILESTONE_TITLES: Record<string, string> = {
+	descale: 'Descaled the coffee machine',
+	deep_clean: 'Deep cleaned the kitchen and fridge'
+};
+
+export function milestoneTitle(taskKey: string, label: string): string {
+	return MILESTONE_TITLES[taskKey] ?? [...label].slice(0, TITLE_MAX).join('');
+}
+
 /** Creates the celebratory post for an approved milestone submission, inside the approve tx. */
 export async function createMilestonePost(db: Executor, submission: Submission): Promise<void> {
 	const [row] = await db
-		.select({ username: users.displayUsername, label: tasks.label })
+		.select({ username: users.displayUsername, label: tasks.label, key: tasks.key })
 		.from(users)
 		.innerJoin(tasks, eq(tasks.key, submission.taskKey))
 		.where(eq(users.id, submission.userId));
 	if (!row) throw new Error(`Cannot create milestone post for submission ${submission.id}`);
 	await createPost(db, submission.userId, {
+		title: milestoneTitle(row.key, row.label),
 		body: `${row.username} just did: ${row.label}! 🎉`,
 		imagePath: submission.imagePath ?? undefined,
 		milestoneSubmissionId: submission.id
@@ -134,6 +179,7 @@ export const onMilestonePost = (submission: Submission, tx: Executor) =>
 export type PostView = {
 	id: number;
 	createdAt: Date;
+	title: string;
 	body: string;
 	imagePath: string | null;
 	milestone: { taskLabel: string } | null;
@@ -182,6 +228,7 @@ export async function listPosts(
 		.select({
 			id: posts.id,
 			createdAt: posts.createdAt,
+			title: posts.title,
 			body: posts.body,
 			imagePath: posts.imagePath,
 			milestoneSubmissionId: posts.milestoneSubmissionId,
@@ -240,6 +287,7 @@ export async function listPosts(
 		posts: pageRows.map((r) => ({
 			id: r.id,
 			createdAt: r.createdAt,
+			title: r.title,
 			body: r.body,
 			imagePath: r.imagePath,
 			milestone: r.milestoneSubmissionId !== null ? { taskLabel: r.taskLabel ?? 'a milestone' } : null,

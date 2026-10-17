@@ -156,6 +156,7 @@ export const posts = pgTable(
 		userId: integer('user_id')
 			.notNull()
 			.references(() => users.id),
+		title: text('title').notNull(),
 		body: text('body').notNull().default(''),
 		imagePath: text('image_path'),
 		milestoneSubmissionId: integer('milestone_submission_id').references(() => submissions.id),
@@ -163,7 +164,8 @@ export const posts = pgTable(
 	},
 	(t) => [
 		uniqueIndex('posts_milestone_submission_idx').on(t.milestoneSubmissionId),
-		index('posts_created_idx').on(t.createdAt)
+		index('posts_created_idx').on(t.createdAt),
+		check('posts_title_length_check', sql`char_length(${t.title}) between 1 and 80`)
 	]
 );
 

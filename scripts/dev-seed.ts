@@ -225,15 +225,15 @@ async function seed(db: Db): Promise<void> {
 	await submitPhotoTask(db, idOf('amara'), 'grounds', photo(), { now: ago(0.5) });
 
 	// Text posts with reactions and comments.
-	const textPosts: [string, string, number][] = [
-		['aiko', 'Does anyone else hear the machine rattling? Maybe time to descale.', 70],
-		['sofia', 'Whoever left the lemon cake on Friday: thank you, it was gone in ten minutes.', 30],
-		['jonas', 'Reminder: the dishwasher is full of clean cups, please empty it before adding more.', 9],
-		['priya', 'Oat milk is back in the fridge, second shelf.', 1.2]
+	const textPosts: [string, string, string, number][] = [
+		['aiko', 'Is the coffee machine rattling?', 'Does anyone else hear the machine rattling? Maybe time to descale.', 70],
+		['sofia', 'Thank you for the lemon cake', 'Whoever left the lemon cake on Friday: thank you, it was gone in ten minutes.', 30],
+		['jonas', 'Please empty the dishwasher', 'Reminder: the dishwasher is full of clean cups, please empty it before adding more.', 9],
+		['priya', 'Oat milk is back', 'Oat milk is back in the fridge, second shelf.', 1.2]
 	];
 	const postIds: number[] = [];
-	for (const [username, body, hours] of textPosts) {
-		const p = await createPost(db, idOf(username), { body });
+	for (const [username, title, body, hours] of textPosts) {
+		const p = await createPost(db, idOf(username), { title, body });
 		await db.update(posts).set({ createdAt: ago(hours) }).where(eq(posts.id, p.id));
 		postIds.push(p.id);
 	}

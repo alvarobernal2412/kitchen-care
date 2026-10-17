@@ -25,6 +25,7 @@ import {
 	NotAuthorError,
 	addComment,
 	createMilestonePost,
+	milestoneTitle,
 	onMilestonePost,
 	createPost,
 	deleteOwnComment,
@@ -118,36 +119,75 @@ describe('emoji', () => {
 
 describe('createPost', () => {
 	it('creates a sanitised text post', async () => {
-		const p = await createPost(t.db, alice, { body: '  hello\r\nworld ​ ' });
+		const p = await createPost(t.db, alice, { title: 'Title', body: '  hello\r\nworld ​ ' });
 		expect(p).toMatchObject({ userId: alice, body: 'hello\nworld', imagePath: null });
 	});
 
 	it('enforces 1-500 characters after trimming', async () => {
-		await expect(createPost(t.db, alice, { body: '' })).rejects.toBeInstanceOf(InvalidTextError);
-		await expect(createPost(t.db, alice, { body: '   ​ ' })).rejects.toBeInstanceOf(
+		await expect(createPost(t.db, alice, { title: 'Title', body: '' })).rejects.toBeInstanceOf(InvalidTextError);
+		await expect(createPost(t.db, alice, { title: 'Title', body: '   ​ ' })).rejects.toBeInstanceOf(
 			InvalidTextError
 		);
-		await expect(createPost(t.db, alice, { body: 'a' })).resolves.toBeTruthy();
-		await expect(createPost(t.db, alice, { body: 'a'.repeat(500) })).resolves.toBeTruthy();
-		await expect(createPost(t.db, alice, { body: 'a'.repeat(501) })).rejects.toBeInstanceOf(
+		await expect(createPost(t.db, alice, { title: 'Title', body: 'a' })).resolves.toBeTruthy();
+		await expect(createPost(t.db, alice, { title: 'Title', body: 'a'.repeat(500) })).resolves.toBeTruthy();
+		await expect(createPost(t.db, alice, { title: 'Title', body: 'a'.repeat(501) })).rejects.toBeInstanceOf(
 			InvalidTextError
 		);
+	});
+
+	describe('title', () => {
+		const make = (title: string) => createPost(t.db, alice, { title, body: 'body' });
+
+		it('is required: empty and whitespace-only/invisible titles are rejected', async () => {
+			await expect(make('')).rejects.toBeInstanceOf(InvalidTextError);
+			await expect(make('   \n\t ​ ')).rejects.toBeInstanceOf(InvalidTextError);
+			await expect(make('')).rejects.toThrow(/title cannot be empty/i);
+		});
+
+		it('accepts 1 and 80 characters, rejects 81', async () => {
+			await expect(make('a')).resolves.toMatchObject({ title: 'a' });
+			await expect(make('b'.repeat(80))).resolves.toBeTruthy();
+			await expect(make('c'.repeat(81))).rejects.toThrow(
+				/title is too long \(80 characters max\)/i
+			);
+		});
+
+		it('counts code points, not UTF-16 units', async () => {
+			await expect(make('😀'.repeat(80))).resolves.toBeTruthy();
+			await expect(make('😀'.repeat(81))).rejects.toBeInstanceOf(InvalidTextError);
+		});
+
+		it('trims, collapses newlines to spaces and strips control characters', async () => {
+			expect((await make('  Hello\r\nthere\n\n\nfriend  ')).title).toBe('Hello there friend');
+			expect((await make('a\u0007b\u0000c')).title).toBe('abc');
+		});
+
+		it('keeps the body required', async () => {
+			await expect(createPost(t.db, alice, { title: 'ok', body: '' })).rejects.toThrow(
+				/post cannot be empty/i
+			);
+			expect(await t.db.select().from(posts)).toHaveLength(0);
+		});
+
+		it('is stored as inert text', async () => {
+			expect((await make('<b>hi</b>')).title).toBe('<b>hi</b>');
+		});
 	});
 
 	it('refuses user images (only milestone posts carry one)', async () => {
 		await expect(
-			createPost(t.db, alice, { body: 'x', imagePath: 'a.webp' })
+			createPost(t.db, alice, { title: 'Title', body: 'x', imagePath: 'a.webp' })
 		).rejects.toBeInstanceOf(InvalidTextError);
 	});
 
 	it('stores <script> as inert text', async () => {
-		const p = await createPost(t.db, alice, { body: '<script>alert(1)</script>' });
+		const p = await createPost(t.db, alice, { title: 'Title', body: '<script>alert(1)</script>' });
 		expect(p.body).toBe('<script>alert(1)</script>');
 	});
 
 	it('rejects deactivated users', async () => {
 		await t.db.update(users).set({ active: false }).where(eq(users.id, alice));
-		await expect(createPost(t.db, alice, { body: 'hi' })).rejects.toBeInstanceOf(
+		await expect(createPost(t.db, alice, { title: 'Title', body: 'hi' })).rejects.toBeInstanceOf(
 			InactiveUserError
 		);
 	});
@@ -155,7 +195,7 @@ describe('createPost', () => {
 
 describe('reactions', () => {
 	it('toggling the same emoji twice returns the count to 0', async () => {
-		const p = await createPost(t.db, alice, { body: 'hi' });
+		const p = await createPost(t.db, alice, { title: 'Title', body: 'hi' });
 		const on = await toggleReaction(t.db, bob, p.id, '👏');
 		expect(on.counts['👏']).toBe(1);
 		expect(on.mine).toEqual(['👏']);
@@ -165,7 +205,7 @@ describe('reactions', () => {
 	});
 
 	it('counts each user independently and covers all five emojis', async () => {
-		const p = await createPost(t.db, alice, { body: 'hi' });
+		const p = await createPost(t.db, alice, { title: 'Title', body: 'hi' });
 		await toggleReaction(t.db, alice, p.id, '☕');
 		const r = await toggleReaction(t.db, bob, p.id, '☕');
 		await toggleReaction(t.db, bob, p.id, '🎉');
@@ -176,7 +216,7 @@ describe('reactions', () => {
 	});
 
 	it('rejects emojis outside the five', async () => {
-		const p = await createPost(t.db, alice, { body: 'hi' });
+		const p = await createPost(t.db, alice, { title: 'Title', body: 'hi' });
 		await expect(toggleReaction(t.db, bob, p.id, '👍' as Emoji)).rejects.toBeInstanceOf(
 			InvalidEmojiError
 		);
@@ -184,7 +224,7 @@ describe('reactions', () => {
 	});
 
 	it('rejects deactivated users and unknown posts', async () => {
-		const p = await createPost(t.db, alice, { body: 'hi' });
+		const p = await createPost(t.db, alice, { title: 'Title', body: 'hi' });
 		await t.db.update(users).set({ active: false }).where(eq(users.id, bob));
 		await expect(toggleReaction(t.db, bob, p.id, '👏')).rejects.toBeInstanceOf(
 			InactiveUserError
@@ -195,7 +235,7 @@ describe('reactions', () => {
 
 describe('comments', () => {
 	it('enforces 1-300 characters', async () => {
-		const p = await createPost(t.db, alice, { body: 'hi' });
+		const p = await createPost(t.db, alice, { title: 'Title', body: 'hi' });
 		await expect(addComment(t.db, bob, p.id, '')).rejects.toBeInstanceOf(InvalidTextError);
 		await expect(addComment(t.db, bob, p.id, 'a')).resolves.toBeTruthy();
 		await expect(addComment(t.db, bob, p.id, 'a'.repeat(300))).resolves.toBeTruthy();
@@ -205,13 +245,13 @@ describe('comments', () => {
 	});
 
 	it('neutralises <script> as plain text and strips bidi overrides', async () => {
-		const p = await createPost(t.db, alice, { body: 'hi' });
+		const p = await createPost(t.db, alice, { title: 'Title', body: 'hi' });
 		const c = await addComment(t.db, bob, p.id, '<script>alert(1)</script>‮');
 		expect(c.body).toBe('<script>alert(1)</script>');
 	});
 
 	it('lists oldest first with author info', async () => {
-		const p = await createPost(t.db, alice, { body: 'hi' });
+		const p = await createPost(t.db, alice, { title: 'Title', body: 'hi' });
 		await addComment(t.db, bob, p.id, 'first');
 		await addComment(t.db, alice, p.id, 'second');
 		const list = await listComments(t.db, p.id);
@@ -220,14 +260,14 @@ describe('comments', () => {
 	});
 
 	it('rejects deactivated users and missing posts', async () => {
-		const p = await createPost(t.db, alice, { body: 'hi' });
+		const p = await createPost(t.db, alice, { title: 'Title', body: 'hi' });
 		await t.db.update(users).set({ active: false }).where(eq(users.id, bob));
 		await expect(addComment(t.db, bob, p.id, 'x')).rejects.toBeInstanceOf(InactiveUserError);
 		await expect(addComment(t.db, alice, 999999, 'x')).rejects.toThrow(/not found/i);
 	});
 
 	it('only the author deletes a comment', async () => {
-		const p = await createPost(t.db, alice, { body: 'hi' });
+		const p = await createPost(t.db, alice, { title: 'Title', body: 'hi' });
 		const c = await addComment(t.db, bob, p.id, 'mine');
 		await expect(deleteOwnComment(t.db, alice, c.id)).rejects.toBeInstanceOf(NotAuthorError);
 		await expect(deleteOwnComment(t.db, admin, c.id)).rejects.toBeInstanceOf(NotAuthorError);
@@ -239,14 +279,14 @@ describe('comments', () => {
 
 describe('deleteOwnPost', () => {
 	it("throws NotAuthorError for someone else's post and leaves it", async () => {
-		const p = await createPost(t.db, alice, { body: 'hi' });
+		const p = await createPost(t.db, alice, { title: 'Title', body: 'hi' });
 		await expect(deleteOwnPost(t.db, bob, p.id)).rejects.toBeInstanceOf(NotAuthorError);
 		expect(await t.db.select().from(posts)).toHaveLength(1);
 	});
 
 	it('removes own post with its comments and reactions', async () => {
-		const p = await createPost(t.db, alice, { body: 'hi' });
-		const other = await createPost(t.db, alice, { body: 'keep' });
+		const p = await createPost(t.db, alice, { title: 'Title', body: 'hi' });
+		const other = await createPost(t.db, alice, { title: 'Title', body: 'keep' });
 		await addComment(t.db, bob, p.id, 'c');
 		await toggleReaction(t.db, bob, p.id, '👏');
 		await toggleReaction(t.db, bob, other.id, '👏');
@@ -262,12 +302,21 @@ describe('deleteOwnPost', () => {
 });
 
 describe('listPosts', () => {
+	it('returns the title of each post and the live author name', async () => {
+		await createPost(t.db, alice, { title: 'Oat milk is back', body: 'second shelf' });
+		await t.db.update(users).set({ displayUsername: 'Alice2' }).where(eq(users.id, alice));
+		const [post] = (await listPosts(t.db, { limit: 5 })).posts;
+		expect(post).toMatchObject({ title: 'Oat milk is back', body: 'second shelf' });
+		expect(post.author.username).toBe('Alice2');
+		await t.db.update(users).set({ displayUsername: 'alice' }).where(eq(users.id, alice));
+	});
+
 	async function seedAt(n: number, at: (i: number) => Date) {
 		const ids: number[] = [];
 		for (let i = 0; i < n; i++) {
 			const [row] = await t.db
 				.insert(posts)
-				.values({ userId: alice, body: `p${i}`, createdAt: at(i) })
+				.values({ userId: alice, title: `T${i}`, body: `p${i}`, createdAt: at(i) })
 				.returning();
 			ids.push(row.id);
 		}
@@ -305,7 +354,7 @@ describe('listPosts', () => {
 	});
 
 	it('includes author, counts, own reactions and comment counts', async () => {
-		const p = await createPost(t.db, alice, { body: 'hi' });
+		const p = await createPost(t.db, alice, { title: 'Title', body: 'hi' });
 		await toggleReaction(t.db, alice, p.id, '👏');
 		await toggleReaction(t.db, bob, p.id, '👏');
 		await toggleReaction(t.db, bob, p.id, '🎉');
@@ -332,7 +381,7 @@ describe('listPosts', () => {
 	});
 
 	it('flags deactivated authors', async () => {
-		await createPost(t.db, alice, { body: 'hi' });
+		await createPost(t.db, alice, { title: 'Title', body: 'hi' });
 		await t.db.update(users).set({ active: false }).where(eq(users.id, alice));
 		expect((await listPosts(t.db, { limit: 10 })).posts[0].author.deactivated).toBe(true);
 	});
@@ -347,6 +396,17 @@ describe('listPosts', () => {
 	});
 });
 
+describe('milestoneTitle', () => {
+	it('maps the milestone chores to a sentence and falls back to the label', () => {
+		expect(milestoneTitle('descale', 'Descale coffee machine')).toBe('Descaled the coffee machine');
+		expect(milestoneTitle('deep_clean', 'Deep clean kitchen/fridge')).toBe(
+			'Deep cleaned the kitchen and fridge'
+		);
+		expect(milestoneTitle('other', 'Some chore')).toBe('Some chore');
+		expect([...milestoneTitle('other', 'x'.repeat(200))]).toHaveLength(80);
+	});
+});
+
 describe('milestone posts', () => {
 	async function descale() {
 		const s = await submitPhotoTask(t.db, alice, 'descale', await img(), { uploadDir: dir });
@@ -356,8 +416,8 @@ describe('milestone posts', () => {
 	it('createPost is idempotent per milestone submission, even concurrently', async () => {
 		const s = await descale();
 		const results = await Promise.all([
-			createPost(t.db, alice, { body: 'a', imagePath: 'x.webp', milestoneSubmissionId: s.id }),
-			createPost(t.db, alice, { body: 'a', imagePath: 'x.webp', milestoneSubmissionId: s.id })
+			createPost(t.db, alice, { title: 'Title', body: 'a', imagePath: 'x.webp', milestoneSubmissionId: s.id }),
+			createPost(t.db, alice, { title: 'Title', body: 'a', imagePath: 'x.webp', milestoneSubmissionId: s.id })
 		]);
 		expect(results[0].id).toBe(results[1].id);
 		expect(await t.db.select().from(posts)).toHaveLength(1);
@@ -372,9 +432,11 @@ describe('milestone posts', () => {
 			userId: alice,
 			milestoneSubmissionId: s.id,
 			imagePath: s.imagePath,
+			title: 'Descaled the coffee machine',
 			body: 'alice just did: Descale coffee machine! 🎉'
 		});
 		const feed = (await listPosts(t.db, { limit: 5 })).posts[0];
+		expect(feed.title).toBe('Descaled the coffee machine');
 		expect(feed.milestone).toEqual({ taskLabel: 'Descale coffee machine' });
 		expect(feed.imagePath).toBe(s.imagePath);
 		// the proof file is really there for /media

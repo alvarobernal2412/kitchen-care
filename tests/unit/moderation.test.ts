@@ -38,7 +38,7 @@ afterAll(async () => {
 
 describe('moderation', () => {
 	it("lets an admin delete another user's post with its comments and reactions", async () => {
-		const p = await createPost(t.db, author, { body: 'hello' });
+		const p = await createPost(t.db, author, { title: 'Title', body: 'hello' });
 		await addComment(t.db, author, p.id, 'c');
 		await toggleReaction(t.db, author, p.id, EMOJIS[0]);
 		await adminDeletePost(t.db, admin, p.id);
@@ -48,7 +48,7 @@ describe('moderation', () => {
 	});
 
 	it("lets an admin delete another user's comment only", async () => {
-		const p = await createPost(t.db, author, { body: 'hello' });
+		const p = await createPost(t.db, author, { title: 'Title', body: 'hello' });
 		const c = await addComment(t.db, author, p.id, 'rude');
 		await adminDeleteComment(t.db, admin, c.id);
 		expect(await t.db.select().from(comments).where(eq(comments.id, c.id))).toHaveLength(0);
@@ -56,7 +56,7 @@ describe('moderation', () => {
 	});
 
 	it('refuses non-admins and inactive admins', async () => {
-		const p = await createPost(t.db, author, { body: 'mine' });
+		const p = await createPost(t.db, author, { title: 'Title', body: 'mine' });
 		const c = await addComment(t.db, author, p.id, 'mine');
 		const other = await mk();
 		const dead = await mk('admin');
