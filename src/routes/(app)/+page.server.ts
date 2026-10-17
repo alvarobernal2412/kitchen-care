@@ -3,7 +3,7 @@ import { getDb } from '$lib/server/db';
 import { submissions, tasks } from '$lib/server/db/schema';
 import { getActivePeriod } from '$lib/server/periods';
 import { getUserStanding, listRecentActivity } from '$lib/server/standing';
-import { getCooldownRemaining } from '$lib/server/tasks';
+import { getCooldownState } from '$lib/server/tasks';
 import type { PageServerLoad } from './$types';
 
 /** Tile order on Home: quick chores first, the big photo-reviewed ones last. */
@@ -26,16 +26,22 @@ export const load: PageServerLoad = async ({ locals }) => {
 		(t) => t !== undefined
 	);
 	const tiles = await Promise.all(
-		ordered.map(async (task) => ({
-			key: task.key,
-			label: task.label,
-			points: task.points,
-			needsPhoto: task.requiresPhoto,
-			needsReview: task.needsReview,
-			cooldownSeconds: task.cooldownSeconds,
-			retryAfterSeconds: await getCooldownRemaining(db, user.id, task, now),
-			pendingCount: pendingByTask.get(task.key) ?? 0
-		}))
+		ordered.map(async (task) => {
+			// Chores with a cooldown (including the reviewed grounds photo) report what is left and
+			// whether the submission behind it still waits for review; removed ones do not count.
+			const cooldown = await getCooldownState(db, user.id, task, now);
+			return {
+				key: task.key,
+				label: task.label,
+				points: task.points,
+				needsPhoto: task.requiresPhoto,
+				needsReview: task.needsReview,
+				cooldownSeconds: task.cooldownSeconds,
+				retryAfterSeconds: cooldown.remainingSeconds,
+				cooldownStatus: cooldown.lastStatus,
+				pendingCount: pendingByTask.get(task.key) ?? 0
+			};
+		})
 	);
 
 	const [standing, activity] = period
@@ -51,6 +57,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 			label: tasks.label,
 			status: submissions.status,
 			rejectReason: submissions.rejectReason,
+			revokeReason: submissions.revokeReason,
 			points: submissions.pointsAwarded,
 			createdAt: submissions.createdAt
 		})

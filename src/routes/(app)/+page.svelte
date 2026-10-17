@@ -39,18 +39,18 @@
 			};
 			const at = availableAt(t.key);
 			let state: TileState;
-			if (at > now) state = 'cooldown';
+			// A reviewed chore with a daily limit waits (not tappable) while its photo is unreviewed.
+			if (at > now) state = t.needsReview && t.cooldownStatus === 'pending' ? 'pending' : 'cooldown';
 			else if (t.needsReview && t.pendingCount > 0) state = 'pending';
 			else if (t.needsReview) state = 'photo';
 			else state = 'ready';
-			return { task, state, at, cooldownSeconds: t.cooldownSeconds, full: t.pendingCount >= MAX_PENDING, pending: t.pendingCount };
+			return { task, state, at, cooldownSeconds: t.cooldownSeconds, locked: t.pendingCount >= MAX_PENDING || (t.cooldownSeconds > 0 && at > now), pending: t.pendingCount };
 		})
 	);
 
 	const READY_NAMES: Record<string, string> = {
 		cutlery: 'cutlery',
-		dishwasher: 'dishwasher',
-		grounds: 'coffee grounds'
+		dishwasher: 'dishwasher'
 	};
 	const readyNames = $derived(
 		tiles
@@ -299,11 +299,16 @@
 							<span class="st ok">Approved +{r.points}</span>
 						{:else if r.status === 'pending'}
 							<span class="st wait">Waiting for review</span>
+						{:else if r.status === 'revoked'}
+							<span class="st bad">Removed</span>
 						{:else}
 							<span class="st bad">Rejected</span>
 						{/if}
 						{#if r.status === 'rejected' && r.rejectReason}
 							<span class="reason">{r.rejectReason}</span>
+						{/if}
+						{#if r.status === 'revoked'}
+							<span class="reason">Removed by admin: {r.revokeReason ?? 'no reason given'}</span>
 						{/if}
 					</li>
 				{/each}
@@ -354,7 +359,7 @@
 						{now}
 						wide={t.task.key === 'deep_clean'}
 						busy={busyKey === t.task.key}
-						disabled={(busyKey !== null && busyKey !== t.task.key) || (t.state === 'pending' && t.full)}
+						disabled={(busyKey !== null && busyKey !== t.task.key) || (t.state === 'pending' && t.locked)}
 						note={notes[t.task.key] ?? null}
 						pendingCount={t.pending}
 						onLog={onTile}

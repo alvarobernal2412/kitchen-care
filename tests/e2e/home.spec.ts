@@ -1,6 +1,10 @@
+import { mkdir, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
+import sharp from 'sharp';
 import { eq } from 'drizzle-orm';
 import * as schema from '../../src/lib/server/db/schema';
+import { E2E_UPLOAD_DIR } from './env';
 import { createUser, db, getUser, giveSession } from './helpers';
 
 const PHONE = { width: 390, height: 844 };
@@ -16,9 +20,10 @@ async function activePeriodId(): Promise<number> {
 
 type Seed = {
 	task: string;
-	status?: 'pending' | 'approved' | 'rejected';
+	status?: 'pending' | 'approved' | 'rejected' | 'revoked';
 	points?: number;
 	ageSeconds?: number;
+	revokeReason?: string;
 };
 
 /** Inserts submissions straight into the e2e database for a user. */
@@ -52,7 +57,8 @@ async function seed(username: string, rows: Seed[]) {
 			taskKey: r.task,
 			periodId,
 			status,
-			pointsAwarded: status === 'approved' ? (r.points ?? 1) : 0,
+			pointsAwarded: status === 'approved' || status === 'revoked' ? (r.points ?? 1) : 0,
+			revokeReason: r.revokeReason ?? null,
 			createdAt: new Date(Date.now() - (r.ageSeconds ?? 0) * 1000)
 		});
 	}
@@ -162,7 +168,7 @@ test.describe('home on a phone', () => {
 		await expect(total(page)).toHaveText('2');
 		await expect(page.getByTestId('rank')).toHaveText(/^\d+(st|nd|rd|th) of \d+$/);
 		await expect(page.getByTestId('status')).toContainText(/credits? behind first place|first place/);
-		await expect(page.getByTestId('status')).toContainText('Cutlery and coffee grounds are ready to log.');
+		await expect(page.getByTestId('status')).toContainText('Cutlery is ready to log.');
 
 		const states = await page.locator('.chore').evaluateAll((els) =>
 			els.map((el) => [(el as HTMLElement).dataset.task, (el as HTMLElement).dataset.state])
@@ -170,21 +176,21 @@ test.describe('home on a phone', () => {
 		expect(states).toEqual([
 			['cutlery', 'ready'],
 			['dishwasher', 'cooldown'],
-			['grounds', 'ready'],
+			['grounds', 'photo'],
 			['milk', 'photo'],
 			['beans', 'pending'],
 			['descale', 'photo'],
 			['deep_clean', 'photo']
 		]);
 
-		await expect(tile(page, 'grounds')).toContainText('Tap to log');
+		await expect(tile(page, 'grounds')).toContainText('Photo + review');
 		await expect(tile(page, 'cutlery')).toContainText('Photo check');
 		await expect(tile(page, 'milk')).toContainText('Photo + review');
 		await expect(tile(page, 'beans')).toContainText('Waiting for review');
 		await expect(tile(page, 'dishwasher')).toContainText(/Ready in \d+ (min|h)/);
 		const dish = page.getByRole('button', { name: /^\+2 Empty or run dishwasher Ready in/ });
 		await expect(dish).toHaveAttribute('aria-disabled', 'true');
-		await expect(page.getByRole('button', { name: /^\+3 Take coffee grounds.* Tap to log/ })).toBeEnabled();
+		await expect(page.getByRole('button', { name: /^\+3 Take coffee grounds.* Photo \+ review/ })).toBeEnabled();
 	});
 
 	test('cooldown fill reflects the elapsed share of the cooldown', async ({ page }) => {
@@ -234,27 +240,27 @@ test.describe('home on a phone', () => {
 		await expect(total(page)).toHaveText('0');
 		const before = await tileBoxes(page);
 
-		await tile(page, 'grounds').click();
+		await tile(page, 'dishwasher').click();
 
-		await expect(total(page)).toHaveText('3');
-		await expect(tile(page, 'grounds')).toHaveAttribute('data-state', 'cooldown');
-		await expect(tile(page, 'grounds')).toContainText(/Ready in/);
+		await expect(total(page)).toHaveText('2');
+		await expect(tile(page, 'dishwasher')).toHaveAttribute('data-state', 'cooldown');
+		await expect(tile(page, 'dishwasher')).toContainText(/Ready in/);
 		await expect(page.getByTestId('status')).not.toContainText('Log your first chore');
 		await expect(page.getByTestId('rank')).toHaveText(/^\d+(st|nd|rd|th) of \d+$/);
 		// the activity feed refreshes too
 		const latest = page.locator('.recent li').first();
 		await expect(latest.locator('.user')).toHaveText(username);
-		await expect(latest.locator('.act')).toHaveText('logged coffee grounds');
+		await expect(latest.locator('.act')).toHaveText('logged dishwasher');
 		expect(await tileBoxes(page)).toEqual(before);
 
 		const [row] = await db
 			.select()
 			.from(schema.submissions)
 			.where(eq(schema.submissions.userId, (await getUser(username)).id));
-		expect(row).toMatchObject({ taskKey: 'grounds', status: 'approved', pointsAwarded: 3 });
+		expect(row).toMatchObject({ taskKey: 'dishwasher', status: 'approved', pointsAwarded: 2 });
 	});
 
-	test('two quick logs in a row: the total ends on the second server value', async ({ page }) => {
+	test('a log updates the total to the server value and survives a reload', async ({ page }) => {
 		const username = await signedIn(page);
 		await openHome(page);
 		const responses: number[] = [];
@@ -262,21 +268,20 @@ test.describe('home on a phone', () => {
 			if (/\/api\/tasks\//.test(r.url()) && r.ok()) responses.push((await r.json()).newTotal);
 		});
 		await tile(page, 'dishwasher').click();
-		// the second tap lands while the first celebration is still playing (fly + count-up)
-		await tile(page, 'grounds').click();
-		await expect.poll(() => responses).toEqual([2, 5]);
-		await expect(total(page)).toHaveText('5');
+		await expect.poll(() => responses).toEqual([2]);
+		await expect(total(page)).toHaveText('2');
 		await expect(tile(page, 'dishwasher')).toHaveAttribute('data-state', 'cooldown');
-		await expect(tile(page, 'grounds')).toHaveAttribute('data-state', 'cooldown');
+		// a second tap on the cooling tile is ignored
+		await tile(page, 'dishwasher').click({ force: true });
 		await expect(page.getByTestId('fly')).toHaveCount(0);
-		// the refreshed server data agrees (still 5 after a reload)
+		// the refreshed server data agrees (still 2 after a reload)
 		await page.reload();
-		await expect(total(page)).toHaveText('5');
+		await expect(total(page)).toHaveText('2');
 		const rows = await db
 			.select()
 			.from(schema.submissions)
 			.where(eq(schema.submissions.userId, (await getUser(username)).id));
-		expect(rows).toHaveLength(2);
+		expect(rows).toHaveLength(1);
 	});
 
 	test('the +N flies to the total when motion is allowed', async ({ page }) => {
@@ -291,9 +296,9 @@ test.describe('home on a phone', () => {
 			}).observe(document, { childList: true, subtree: true });
 		});
 		await openHome(page);
-		await tile(page, 'grounds').click();
+		await tile(page, 'dishwasher').click();
 		await expect.poll(() => page.evaluate(() => (window as unknown as { __fly: number }).__fly)).toBe(1);
-		await expect(total(page)).toHaveText('3');
+		await expect(total(page)).toHaveText('2');
 		await expect(page.getByTestId('fly')).toHaveCount(0);
 	});
 
@@ -302,14 +307,14 @@ test.describe('home on a phone', () => {
 		page.on('dialog', () => {
 			throw new Error('unexpected dialog');
 		});
-		await page.route('**/api/tasks/grounds', (route) =>
+		await page.route('**/api/tasks/dishwasher', (route) =>
 			route.fulfill({ status: 429, json: { error: 'rate_limited' } })
 		);
 		await openHome(page);
-		await tile(page, 'grounds').click();
+		await tile(page, 'dishwasher').click();
 		await expect(page.getByTestId('message')).toContainText('Too many tries');
 		await expect(total(page)).toHaveText('0');
-		await expect(tile(page, 'grounds')).toHaveAttribute('data-state', 'ready');
+		await expect(tile(page, 'dishwasher')).toHaveAttribute('data-state', 'ready');
 	});
 
 	test('a user with no points is invited to log a first chore', async ({ page }) => {
@@ -392,10 +397,101 @@ test.describe('home with reduced motion', () => {
 			}).observe(document, { childList: true, subtree: true });
 		});
 		await openHome(page);
-		await tile(page, 'grounds').click();
-		await expect(total(page)).toHaveText('3');
-		await expect(tile(page, 'grounds')).toHaveAttribute('data-state', 'cooldown');
+		await tile(page, 'dishwasher').click();
+		await expect(total(page)).toHaveText('2');
+		await expect(tile(page, 'dishwasher')).toHaveAttribute('data-state', 'cooldown');
 		expect(await page.evaluate(() => (window as unknown as { __fly: number }).__fly)).toBe(0);
+	});
+});
+
+test.describe('coffee grounds is a reviewed photo chore', () => {
+	test.use({ viewport: PHONE });
+
+	test('is not tappable while its latest photo waits for review', async ({ page }) => {
+		const username = await signedIn(page);
+		await seed(username, [{ task: 'grounds', status: 'pending', ageSeconds: 3600 }]);
+		await openHome(page);
+		const grounds = tile(page, 'grounds');
+		await expect(grounds).toHaveAttribute('data-state', 'pending');
+		await expect(grounds).toContainText('Waiting for review');
+		await expect(grounds).toHaveAttribute('aria-disabled', 'true');
+		await expect(
+			page.getByRole('button', { name: /^\+3 Take coffee grounds.* Waiting for review, 1 waiting$/ })
+		).toBeVisible();
+		await grounds.click({ force: true });
+		await expect(page.getByRole('dialog')).toHaveCount(0);
+	});
+
+	test('counts down after an approved log and fills like the dishwasher', async ({ page }) => {
+		const username = await signedIn(page);
+		await seed(username, [{ task: 'grounds', points: 3, ageSeconds: 3600 }]);
+		await openHome(page);
+		const grounds = tile(page, 'grounds');
+		await expect(grounds).toHaveAttribute('data-state', 'cooldown');
+		await expect(grounds).toContainText(/Ready in 2[23] h \d+ min/);
+		await expect(grounds).toHaveAttribute('aria-disabled', 'true');
+		const fill = parseFloat(await grounds.evaluate((el) => (el as HTMLElement).style.getPropertyValue('--fill')));
+		expect(fill).toBeGreaterThan(3);
+		expect(fill).toBeLessThan(6);
+		await expect(total(page)).toHaveText('3');
+	});
+
+	test('is available again after a rejection or a removal', async ({ page }) => {
+		const username = await signedIn(page);
+		await seed(username, [
+			{ task: 'grounds', status: 'rejected', ageSeconds: 60 },
+			{ task: 'grounds', status: 'revoked', points: 3, ageSeconds: 30, revokeReason: 'wrong bin' }
+		]);
+		await openHome(page);
+		await expect(tile(page, 'grounds')).toHaveAttribute('data-state', 'photo');
+		await expect(tile(page, 'grounds')).not.toHaveAttribute('aria-disabled', 'true');
+		await expect(total(page)).toHaveText('0');
+	});
+
+	test('a removed chore shows who removed it and why, and scores nothing', async ({ page }) => {
+		const username = await signedIn(page);
+		await seed(username, [
+			{ task: 'dishwasher', status: 'revoked', points: 2, ageSeconds: 120, revokeReason: 'it was already empty' },
+			{ task: 'dishwasher', points: 2, ageSeconds: 20000 }
+		]);
+		await openHome(page);
+		await expect(total(page)).toHaveText('2');
+		const mine = page.locator('.mine li').first();
+		await expect(mine).toContainText('Empty or run dishwasher');
+		await expect(mine).toContainText('Removed');
+		await expect(mine).toContainText('Removed by admin: it was already empty');
+		await expect(mine).not.toContainText('+2');
+		await expect(tile(page, 'dishwasher')).toHaveAttribute('data-state', 'ready');
+		await noHorizontalOverflow(page);
+	});
+});
+
+test.describe('avatars in recent activity', () => {
+	test.use({ viewport: PHONE });
+
+	test('an uploaded avatar shows as an image, a missing one as initials', async ({ page }) => {
+		const withAvatar = await signedIn(page);
+		const name = `${'a'.repeat(32 - 8)}${Math.random().toString(16).slice(2, 10).padEnd(8, '0')}`;
+		await mkdir(E2E_UPLOAD_DIR, { recursive: true });
+		const file = `${name}.webp`;
+		await writeFile(
+			join(E2E_UPLOAD_DIR, file),
+			await sharp({ create: { width: 64, height: 64, channels: 3, background: '#2a6' } }).webp().toBuffer()
+		);
+		await db.update(schema.users).set({ avatarPath: file }).where(eq(schema.users.id, (await getUser(withAvatar)).id));
+		const plain = 'plain' + Math.random().toString(36).slice(2, 7);
+		const plainCreds = await createUser(plain);
+		createdUsers.push((await getUser(plainCreds.username)).id);
+		await seed(withAvatar, [{ task: 'dishwasher', points: 2, ageSeconds: 100 }]);
+		await seed(plain, [{ task: 'dishwasher', points: 2, ageSeconds: 50 }]);
+		await openHome(page);
+
+		const rowOf = (u: string) => page.locator('.recent li').filter({ has: page.locator('.user', { hasText: u }) });
+		const img = rowOf(withAvatar).locator('img');
+		await expect(img).toHaveAttribute('src', `/media/${file}`);
+		await expect.poll(() => img.evaluate((el: HTMLImageElement) => el.naturalWidth)).toBeGreaterThan(0);
+		await expect(rowOf(plain).locator('img')).toHaveCount(0);
+		await expect(rowOf(plain)).toContainText(plain.slice(0, 1).toUpperCase());
 	});
 });
 
@@ -449,7 +545,7 @@ test.describe('home in dark mode', () => {
 				return c;
 			}, token);
 		expect(await resolve('--accent-wash')).toBe('rgb(31, 58, 51)');
-		await expect(tile(page, 'grounds')).toHaveCSS('background-color', 'rgb(31, 58, 51)');
+		await expect(tile(page, 'cutlery')).toHaveCSS('background-color', 'rgb(31, 58, 51)');
 		await expect(tile(page, 'milk')).toHaveCSS('background-color', await resolve('--surface'));
 		await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(16, 22, 19)');
 	});
