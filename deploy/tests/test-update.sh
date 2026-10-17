@@ -97,6 +97,8 @@ upd
 if [ "$(cat "$T/clone/state/deployed")" = "$(short "$C3")" ]; then r=0; else r=1; fi
 expect "deployed commit recorded" $r
 
+[ "$rc" = 0 ] && grep -q "^build .*--build-arg GIT_SHA=$(short "$C3") " "$T/stub/calls"; expect "image build receives GIT_SHA (the 12-char sha)" $?
+
 # 2. Same commit again: already deployed, no build.
 upd
 [ "$rc" = 0 ] && ! built "$C3" && grep -q "already deployed" "$T/out"; expect "unchanged: already deployed, no build" $?

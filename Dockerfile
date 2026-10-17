@@ -35,6 +35,10 @@ COPY --from=build --chown=node:node /app/build ./build
 COPY --from=build --chown=node:node /app/build-scripts ./scripts
 COPY --chown=node:node drizzle ./drizzle
 COPY --chown=node:node package.json ./
+# The deployed commit, shown on the admin System page (deploy/update.sh passes the 12-char sha).
+# Declared last so a new sha only changes the final layers, not the copied build.
+ARG GIT_SHA=dev
+ENV APP_VERSION=${GIT_SHA}
 # The directory exists with the right owner so a fresh named volume inherits it.
 RUN mkdir -p /data/uploads && chown -R node:node /data
 USER node

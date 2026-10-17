@@ -131,7 +131,7 @@ check_build_memory
 BUILD_MB=$(env_num NODE_BUILD_MEMORY_MB 768)
 log "building kitchen-care-app:$TAG (Node heap cap ${BUILD_MB} MB)"
 run_child docker build -t "kitchen-care-app:$TAG" --label "$PROJECT_LABEL" \
-	--build-arg "NODE_BUILD_MEMORY_MB=$BUILD_MB" . || die "image build failed; ${ACTIVE:-no colour} keeps serving"
+	--build-arg "NODE_BUILD_MEMORY_MB=$BUILD_MB" --build-arg "GIT_SHA=$TAG" . || die "image build failed; ${ACTIVE:-no colour} keeps serving"
 
 KC_LOGGING=1
 export KC_LOGGING
