@@ -6,6 +6,8 @@ export default defineConfig({
 	globalSetup: './tests/e2e/global-setup.ts',
 	workers: 1,
 	retries: process.env.CI ? 1 : 0,
+	// A test that only passes on retry is a failure, not a green run with a note nobody reads.
+	failOnFlakyTests: !!process.env.CI,
 	reporter: [['list']],
 	// Production build against the dedicated e2e database (created by global-setup.ts).
 	// Playwright starts this before global setup; the app connects to the database lazily.
