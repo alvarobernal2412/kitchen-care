@@ -116,3 +116,38 @@ export async function lowestContrast(page: Page, selector: string) {
 		return lowest;
 	});
 }
+
+/**
+ * Horizontal overflow of the current page: the document wider than the viewport, or any visible
+ * element reaching past it. Elements inside a horizontally scrollable region (the heatmap, the
+ * admin section tabs) may extend and are skipped, as are hidden ones (collapsed-rail tooltips).
+ */
+export async function overflowReport(page: Page): Promise<string[]> {
+	return page.evaluate(() => {
+		const out: string[] = [];
+		const vw = window.innerWidth;
+		if (document.documentElement.scrollWidth > vw) {
+			out.push(`document scrollWidth ${document.documentElement.scrollWidth} > ${vw}`);
+		}
+		const scrolls = (el: Element) => {
+			for (let p: Element | null = el; p && p !== document.body; p = p.parentElement) {
+				const o = getComputedStyle(p).overflowX;
+				if (o === 'auto' || o === 'scroll') return true;
+			}
+			return false;
+		};
+		for (const el of document.body.querySelectorAll('*')) {
+			const cs = getComputedStyle(el);
+			if (cs.display === 'none' || cs.visibility === 'hidden') continue;
+			// shapes inside an <svg> are covered by the svg itself
+			if (el.tagName.toLowerCase() !== 'svg' && el.closest('svg')) continue;
+			const r = el.getBoundingClientRect();
+			if (r.width === 0 || r.height === 0) continue;
+			if ((r.right > vw + 0.5 || r.left < -0.5) && !scrolls(el)) {
+				const cls = (el.getAttribute('class') ?? '').trim();
+				out.push(`${el.tagName.toLowerCase()}${cls ? '.' + cls : ''} ${Math.round(r.left)}..${Math.round(r.right)} of ${vw}`);
+			}
+		}
+		return out;
+	});
+}
