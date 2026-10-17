@@ -295,6 +295,9 @@
 			flex-direction: column;
 			gap: var(--sp-2);
 			min-height: 0;
+			/* room for the 2px + 2px focus outline a scrolling box would clip; net layout unchanged */
+			padding: 4px;
+			margin: -4px;
 		}
 		.shell[data-nav='expanded'] .scroller {
 			overflow-y: auto;
