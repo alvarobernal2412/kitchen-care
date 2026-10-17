@@ -22,11 +22,10 @@
 		return new Set(data.rows.filter((r) => counts[r.rank] > 1).map((r) => r.rank));
 	});
 
-	/** "Employee, tied for 1st, Interactions Research Group" (department only for employees). */
+	/** "Employee, Interactions Research Group" (department only for employees). */
 	function meta(r: (typeof data.rows)[number]): string {
 		const parts: string[] = [];
 		if (r.classification) parts.push(r.classification);
-		if (tiedRanks.has(r.rank)) parts.push(`tied for ${ordinal(r.rank)}`);
 		if (r.department) parts.push(r.department);
 		return parts.join(', ');
 	}
@@ -80,6 +79,7 @@
 						<span class="line">
 							<span class="name">{row.username}</span>
 							{#if me}<span class="chip you">you</span>{/if}
+							{#if tiedRanks.has(row.rank)}<span class="chip chip-neutral tie">tied for {ordinal(row.rank)}</span>{/if}
 						</span>
 						<span class="meta">{meta(row)}</span>
 					</span>
@@ -196,6 +196,9 @@
 	li.lead .name {
 		font: 700 20px / 1.1 var(--font-display);
 		letter-spacing: -0.02em;
+	}
+	.tie {
+		flex: none;
 	}
 	.you {
 		flex: none;
