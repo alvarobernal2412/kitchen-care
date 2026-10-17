@@ -5,7 +5,7 @@ import { createUser, getUser, giveSession, signUp, uniqueUsername } from './help
 const HOME = `${E2E_ORIGIN}/`;
 const SLOGAN = "Good karma pays out: Rack up your credits for this semester's grand reward.";
 
-test('a new user sees the carousel once, then goes straight home', async ({ page }) => {
+test('a new user sees the carousel once, then goes straight home', { tag: '@smoke' }, async ({ page }) => {
 	const username = uniqueUsername('onb');
 	await signUp(page, username);
 
@@ -83,7 +83,7 @@ test('onboarding still completes when storage is unavailable', async ({ page }) 
 test.describe('without JavaScript', () => {
 	test.use({ javaScriptEnabled: false });
 
-	test('all three steps are on one page and Get started works', async ({ page }) => {
+	test('all three steps are on one page and Get started works', { tag: '@smoke' }, async ({ page }) => {
 		const username = uniqueUsername('nojs');
 		await signUp(page, username);
 		await expect(page).toHaveURL(/\/onboarding$/);

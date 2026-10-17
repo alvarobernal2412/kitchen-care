@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { E2E_ORIGIN } from './env';
 import { dropSessions, loginAsAdmin, loginAsNewUser } from './helpers';
 
-test.describe('anonymous visitors', () => {
+test.describe('anonymous visitors', { tag: '@smoke' }, () => {
 	for (const path of ['/', '/feed', '/leaderboard', '/profile', '/admin/users']) {
 		test(`${path} redirects to /login`, async ({ page }) => {
 			await page.goto(path);
@@ -38,7 +38,7 @@ test.describe('anonymous visitors', () => {
 	});
 });
 
-test('an expired session during client-side navigation lands on /login without an error page', async ({
+test('an expired session during client-side navigation lands on /login without an error page', { tag: '@smoke' }, async ({
 	page
 }) => {
 	const { username } = await loginAsNewUser(page);
@@ -55,7 +55,7 @@ test('an expired session during client-side navigation lands on /login without a
 	await expect(page.getByText(/internal error|500/i)).toHaveCount(0);
 });
 
-test('an enhanced form action after the session expired lands on /login without an error page', async ({
+test('an enhanced form action after the session expired lands on /login without an error page', { tag: '@smoke' }, async ({
 	page
 }) => {
 	const { username, password } = await loginAsNewUser(page);
@@ -72,7 +72,7 @@ test('an enhanced form action after the session expired lands on /login without 
 	await expect(page.getByText(/internal error|500/i)).toHaveCount(0);
 });
 
-test('the guard clears a stale session cookie', async ({ request }) => {
+test('the guard clears a stale session cookie', { tag: '@smoke' }, async ({ request }) => {
 	const res = await request.get('/feed', {
 		maxRedirects: 0,
 		headers: { cookie: 'kc_session=stale-session-id' }
@@ -83,14 +83,14 @@ test('the guard clears a stale session cookie', async ({ request }) => {
 	expect(setCookie.some((h) => /^kc_session=;/.test(h.value) && /max-age=0/i.test(h.value))).toBe(true);
 });
 
-test('a signed-in non-admin gets 403 on admin pages', async ({ page }) => {
+test('a signed-in non-admin gets 403 on admin pages', { tag: '@smoke' }, async ({ page }) => {
 	await loginAsNewUser(page);
 	const res = await page.goto('/admin/users');
 	expect(res?.status()).toBe(403);
 	await expect(page).toHaveURL(`${E2E_ORIGIN}/admin/users`);
 });
 
-test('an admin can open the admin pages', async ({ page }) => {
+test('an admin can open the admin pages', { tag: '@smoke' }, async ({ page }) => {
 	await loginAsAdmin(page);
 	const res = await page.goto('/admin/users');
 	expect(res?.status()).toBe(200);

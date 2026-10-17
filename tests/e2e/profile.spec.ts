@@ -11,7 +11,7 @@ async function testImage(width: number, height: number) {
 		.toBuffer();
 }
 
-test('changing the password signs out other devices but keeps this one', async ({
+test('changing the password signs out other devices but keeps this one', { tag: '@smoke' }, async ({
 	page,
 	browser
 }) => {

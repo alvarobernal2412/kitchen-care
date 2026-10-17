@@ -232,7 +232,7 @@ test.describe('home on a phone', () => {
 		await noHorizontalOverflow(page);
 	});
 
-	test('tapping a ready tile logs the chore, updates the total exactly and keeps the grid still', async ({
+	test('tapping a ready tile logs the chore, updates the total exactly and keeps the grid still', { tag: '@smoke' }, async ({
 		page
 	}) => {
 		const username = await signedIn(page);
@@ -260,7 +260,7 @@ test.describe('home on a phone', () => {
 		expect(row).toMatchObject({ taskKey: 'dishwasher', status: 'approved', pointsAwarded: 2 });
 	});
 
-	test('a log updates the total to the server value and survives a reload', async ({ page }) => {
+	test('a log updates the total to the server value and survives a reload', { tag: '@smoke' }, async ({ page }) => {
 		const username = await signedIn(page);
 		await openHome(page);
 		const responses: number[] = [];
@@ -302,7 +302,7 @@ test.describe('home on a phone', () => {
 		await expect(page.getByTestId('fly')).toHaveCount(0);
 	});
 
-	test('a failed log shows an inline message, never a dialog', async ({ page }) => {
+	test('a failed log shows an inline message, never a dialog', { tag: '@smoke' }, async ({ page }) => {
 		await signedIn(page);
 		page.on('dialog', () => {
 			throw new Error('unexpected dialog');

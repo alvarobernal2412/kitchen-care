@@ -38,7 +38,7 @@ async function widthOf(page: Page, selector: string) {
 test.describe('phone', () => {
 	test.use({ viewport: PHONE });
 
-	test('shows a bottom tab bar with four tabs and no sidebar', async ({ page }) => {
+	test('shows a bottom tab bar with four tabs and no sidebar', { tag: '@smoke' }, async ({ page }) => {
 		await loginAsNewUser(page);
 		await page.goto('/feed');
 		await expect(mainNav(page)).toHaveCount(1);
@@ -154,7 +154,7 @@ test.describe('breakpoint', () => {
 test.describe('laptop sidebar', () => {
 	test.use({ viewport: LAPTOP });
 
-	test('collapses to a 72px rail, keeps labels and persists across reload', async ({ page }) => {
+	test('collapses to a 72px rail, keeps labels and persists across reload', { tag: '@smoke' }, async ({ page }) => {
 		await loginAsNewUser(page);
 		await page.goto('/');
 		expect(await widthOf(page, '#sidebar')).toBeCloseTo(240, 0);
