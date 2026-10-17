@@ -26,7 +26,8 @@ describe('nav items', () => {
 			'Users',
 			'Moderation',
 			'Images',
-			'Analytics'
+			'Analytics',
+			'System'
 		]);
 	});
 });

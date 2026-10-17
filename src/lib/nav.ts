@@ -10,6 +10,7 @@ import {
 	IconImages,
 	IconInbox,
 	IconList,
+	IconPulse,
 	IconUser,
 	IconUsers
 } from '$lib/icons';
@@ -74,7 +75,8 @@ export const ADMIN_NAV_ITEMS: NavItem[] = [
 	admin('users', 'Users', IconUsers),
 	admin('moderation', 'Moderation', IconFlag),
 	admin('images', 'Images', IconImages),
-	admin('analytics', 'Analytics', IconChart)
+	admin('analytics', 'Analytics', IconChart),
+	admin('system', 'System', IconPulse)
 ];
 
 /** Segment aware: `/feed/123` is Feed, `/feeds` is not. */
