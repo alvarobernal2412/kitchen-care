@@ -123,6 +123,10 @@ Vite build (`NODE_BUILD_MEMORY_MB`, 768) and a start guard (`MIN_BUILD_FREE_MB`,
 `--driver-opt` limits is a possible future measure. Runtime: app 384 MB, postgres 192 MB, proxy
 32 MB, runner 1 GB; `MIN_FREE_MB` (400) guards the second colour. Tunables: `.env.example`.
 
+The sign-up welcome bonus ends at `WELCOME_BONUS_UNTIL` (ISO-8601 with an offset or `Z`; default
+`2026-11-20T00:00:00+01:00`). Leave it unset to use the default; a time in the past switches the
+bonus off. Change it in `.env` and redeploy.
+
 ## Rollback
 
 `deploy/rollback.sh` restarts the previous colour (kept stopped), checks it is healthy and switches

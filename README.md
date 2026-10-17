@@ -16,6 +16,13 @@ npm run db:push                   # create the schema in the dev database
 npm run dev
 ```
 
+## Welcome bonus
+
+An account created through sign-up before 20 November 2026 (00:00 Europe/Zurich) gets a one-time
+bonus of 10 credits, but only if a period is active at that moment. It counts like any approved
+credit and shows as "Welcome bonus" in the user's own submissions only. Existing accounts never
+get it. `WELCOME_BONUS_UNTIL` (ISO-8601 with offset, see `.env.example`) moves or disables the cutoff.
+
 ## Try it locally
 
 Needs Node 24 and Docker. The demo data is for local development only: the seed refuses to run
