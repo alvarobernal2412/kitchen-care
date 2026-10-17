@@ -8,7 +8,10 @@ import { seedShowcase, type Showcase } from './showcase';
 /*
  * Accessibility and layout matrix: every key page, light and dark, phone and laptop.
  *  - axe: zero serious or critical violations. Minor and moderate findings are printed at the end.
- *  - layout: no horizontal scroll and nothing past the viewport at 360, 390 and 1280 px.
+ *  - layout: no horizontal scroll and nothing past the viewport (checked on the same page visit).
+ *  - The default run is a representative subset (every page at 390 light; the pages with a unique
+ *    layout at 1280 dark; no-JS onboarding once). A11Y_FULL=1 (npm run test:a11y:full) runs both
+ *    schemes at both viewports for every page, plus the layout check at 360 px.
  *  - keyboard, reduced motion and focus rings that scroll containers must not clip.
  * No axe rule is disabled.
  */
@@ -41,7 +44,16 @@ const VIEWPORTS = [
 	{ width: 390, height: 844 },
 	{ width: 1280, height: 800 }
 ];
-const WIDTHS = [360, 390, 1280];
+const FULL = process.env.A11Y_FULL === '1';
+/** Pages whose layout differs from the others; these also get the laptop + dark cell by default. */
+const UNIQUE_LAYOUT = new Set(['home', 'leaderboard', 'feed', 'admin review', 'admin analytics', 'profile', 'login']);
+
+/** Whether a (scheme, viewport) cell of the matrix runs for a page in this run. */
+function inMatrix(target: Target, scheme: string, width: number): boolean {
+	if (FULL) return true;
+	if (width === 390 && scheme === 'light') return true;
+	return width === 1280 && scheme === 'dark' && UNIQUE_LAYOUT.has(target.name);
+}
 
 let showcase: Showcase;
 let freshUser: { username: string; password: string };
@@ -87,28 +99,32 @@ async function open(page: Page, target: Target): Promise<void> {
 
 for (const scheme of SCHEMES) {
 	for (const viewport of VIEWPORTS) {
-		test.describe(`axe, ${scheme}, ${viewport.width}px`, () => {
+		test.describe(`${scheme}, ${viewport.width}px`, () => {
 			test.use({ colorScheme: scheme, viewport, reducedMotion: 'reduce' });
 
-			for (const target of TARGETS) {
-				test(`${target.name} has no serious or critical violations`, async ({ page }) => {
+			for (const target of TARGETS.filter((t) => inMatrix(t, scheme, viewport.width))) {
+				test(`${target.name}: no serious or critical axe violations, fits the viewport`, async ({ page }) => {
 					await open(page, target);
-					await expectClean(page, `${target.name} ${scheme} ${viewport.width}`);
+					const label = `${target.name} ${scheme} ${viewport.width}`;
+					expect(await overflowReport(page), `${label} overflow`).toEqual([]);
+					await expectClean(page, label);
 				});
 			}
 
 			// axe itself needs JavaScript in the page, so the no-JS view is the server-rendered HTML served
 			// back to a page with its scripts removed: same markup, same CSS, nothing hydrates.
-			test('onboarding without JavaScript has no serious or critical violations', async ({ page }) => {
-				const target = TARGETS.find((t) => t.name === 'onboarding')!;
-				await signIn(page.context(), target.role);
-				const html = (await (await page.request.get(target.path)).text()).replace(/<script[\s\S]*?<\/script>/g, '');
-				await page.route(`**${target.path}`, (route) => route.fulfill({ contentType: 'text/html', body: html }));
-				await page.goto(target.path);
-				await page.waitForLoadState('networkidle');
-				await expect(page.locator('.steps')).toHaveCount(0); // the JS-only step bar is absent
-				await expectClean(page, `onboarding (no JS) ${scheme} ${viewport.width}`);
-			});
+			const onboarding = TARGETS.find((t) => t.name === 'onboarding')!;
+			if (FULL || (scheme === 'light' && viewport.width === 390)) {
+				test('onboarding without JavaScript has no serious or critical violations', async ({ page }) => {
+					await signIn(page.context(), onboarding.role);
+					const html = (await (await page.request.get(onboarding.path)).text()).replace(/<script[\s\S]*?<\/script>/g, '');
+					await page.route(`**${onboarding.path}`, (route) => route.fulfill({ contentType: 'text/html', body: html }));
+					await page.goto(onboarding.path);
+					await page.waitForLoadState('networkidle');
+					await expect(page.locator('.steps')).toHaveCount(0); // the JS-only step bar is absent
+					await expectClean(page, `onboarding (no JS) ${scheme} ${viewport.width}`);
+				});
+			}
 		});
 	}
 }
@@ -130,20 +146,18 @@ async function expectClean(page: Page, label: string): Promise<void> {
 
 // ---------------------------------------------------------------- layout
 
-test.describe('layout', () => {
-	test.use({ reducedMotion: 'reduce' });
-	for (const width of WIDTHS) {
-		test.describe(`${width}px`, () => {
-			test.use({ viewport: { width, height: width >= 900 ? 800 : 844 } });
-			for (const target of TARGETS) {
-				test(`${target.name} fits the viewport`, async ({ page }) => {
-					await open(page, target);
-					expect(await overflowReport(page)).toEqual([]);
-				});
-			}
-		});
-	}
-});
+// 360 px is the narrowest phone; the default run covers 390 and 1280 inside the matrix above.
+if (FULL) {
+	test.describe('layout at 360px', () => {
+		test.use({ reducedMotion: 'reduce', viewport: { width: 360, height: 844 } });
+		for (const target of TARGETS) {
+			test(`${target.name} fits the viewport`, async ({ page }) => {
+				await open(page, target);
+				expect(await overflowReport(page)).toEqual([]);
+			});
+		}
+	});
+}
 
 // ---------------------------------------------------------------- keyboard
 

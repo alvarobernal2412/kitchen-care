@@ -45,8 +45,10 @@ start a fresh one.
   Reset and typography: `base.css`. Shared classes (`.btn`, `.chip`, `.tile`, `.rows`, ...):
   `components.css`. Components use tokens only: no hard-coded colours, mobile-first, no
   `max-width` media queries. Reference mockups and notes: `docs/design/mockups/`.
-- Accessibility and layout checks (axe on every key page, light and dark, phone and laptop;
-  no horizontal scroll; keyboard order; reduced motion; focus rings): `npx playwright test a11y.spec.ts`.
+- Accessibility and layout checks (axe on every key page, phone and laptop, light and dark;
+  no horizontal scroll; keyboard order; reduced motion; focus rings): `npx playwright test a11y.spec.ts`
+  runs a representative subset (about 2 minutes). The full matrix, every page in both schemes at
+  both viewports plus a 360 px layout check (about 6 minutes): `npm run test:a11y:full`.
 - Screenshots of every screen (390 and 1280 px, light and dark) from seeded data:
   `node scripts/screenshots.mjs [output-dir]` (default `tmp/screenshots`, git-ignored). It
   uses the same dedicated e2e database as the e2e suite.

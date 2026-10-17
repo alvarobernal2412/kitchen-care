@@ -11,6 +11,7 @@
 		"lint": "eslint .",
 		"test": "vitest run",
 		"test:e2e": "playwright test",
+		"test:a11y:full": "node scripts/a11y-full.mjs",
 		"db:push": "drizzle-kit push",
 		"db:generate": "drizzle-kit generate"
 	},
