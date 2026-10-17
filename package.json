@@ -4,6 +4,7 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
+		"prepare": "svelte-kit sync || echo ''",
 		"dev": "vite dev",
 		"build": "vite build",
 		"preview": "vite preview",
@@ -12,7 +13,7 @@
 		"test": "vitest run",
 		"test:e2e": "playwright test",
 		"test:a11y:full": "node scripts/a11y-full.mjs",
-		"dev:seed": "vite build -c vite.dev-seed.config.ts && node --env-file-if-exists=.env build-scripts-dev/dev-seed.js",
+		"dev:seed": "svelte-kit sync && vite build -c vite.dev-seed.config.ts && node --env-file-if-exists=.env build-scripts-dev/dev-seed.js",
 		"db:push": "drizzle-kit push",
 		"db:generate": "drizzle-kit generate"
 	},
