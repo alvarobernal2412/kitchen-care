@@ -14,6 +14,7 @@
 		summary
 	}: { points: Point[]; series: Series[]; summary: string } = $props();
 
+	const seriesNames = $derived(series.map((s) => s.name).join(' and '));
 	const axisMax = $derived(niceMax(Math.max(0, ...points.flatMap((p) => p.values))));
 	const empty = $derived(points.every((p) => p.values.every((v) => v === 0)));
 	// About 14px per bar group, so a long range scrolls inside the chart instead of squeezing the bars.
@@ -29,7 +30,9 @@
 			<li><span class="swatch {s.cls}" aria-hidden="true"></span>{s.name}</li>
 		{/each}
 	</ul>
-	<div class="scroll">
+	<!-- Focusable so keyboard users can scroll a long range sideways. -->
+	<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+	<div class="scroll" role="region" aria-label="{seriesNames} chart" tabindex="0">
 		<div class="frame" style="min-width: {minPx}px">
 			<span class="axis-max num" aria-hidden="true">{formatCount(axisMax)}</span>
 			<div class="plot" role="img" aria-label={summary}>
@@ -53,7 +56,8 @@
 	</div>
 	<details>
 		<summary>Show as table</summary>
-		<div class="scroll">
+		<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+		<div class="scroll" role="region" aria-label="{seriesNames} table" tabindex="0">
 			<table>
 				<thead>
 					<tr>
