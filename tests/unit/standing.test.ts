@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { eq } from 'drizzle-orm';
 import { getTestDb, type TestDb } from '../helpers/testDb';
 import { events, periodWinners, periods, submissions, users } from '../../src/lib/server/db/schema';
 import { seedTasks } from '../../src/lib/server/db/seed';
@@ -157,7 +158,29 @@ describe('listRecentActivity', () => {
 		]);
 		expect(rows[0].taskLabel).toBe('Take coffee grounds to 2nd basement');
 		expect(rows[0].at).toBeInstanceOf(Date);
-		expect(Object.keys(rows[0]).sort()).toEqual(['at', 'id', 'taskKey', 'taskLabel', 'username']);
+		expect(Object.keys(rows[0]).sort()).toEqual([
+			'at',
+			'avatarPath',
+			'id',
+			'taskKey',
+			'taskLabel',
+			'username'
+		]);
+		expect(rows.map((r) => r.avatarPath)).toEqual([null, null]);
+	});
+
+	it('returns the avatar file of the person, null when there is none', async () => {
+		const a = await mkUser('alice');
+		const b = await mkUser('bob');
+		await t.db.update(users).set({ avatarPath: 'alice-avatar.webp' }).where(eq(users.id, a));
+		const now = Date.now();
+		await award(a, 2, { at: new Date(now - 2000), task: 'dishwasher' });
+		await award(b, 2, { at: new Date(now - 1000), task: 'dishwasher' });
+		const rows = await listRecentActivity(t.db, periodId);
+		expect(rows.map((r) => [r.username, r.avatarPath])).toEqual([
+			['bob', null],
+			['alice', 'alice-avatar.webp']
+		]);
 	});
 
 	it('caps at the limit (default 8)', async () => {

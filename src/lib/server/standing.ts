@@ -43,11 +43,13 @@ export type ActivityItem = {
 	username: string;
 	taskLabel: string;
 	taskKey: string;
+	/** Stored avatar file of the person, null when they have none (pass to avatarUrl). */
+	avatarPath: string | null;
 	at: Date;
 };
 
 /**
- * Latest approved (including auto-approved) chores of a period, newest first. No images. The
+ * Latest approved (including auto-approved) chores of a period, newest first. No proof images (the avatar only). The
  * welcome bonus is private to its user and never listed here.
  */
 export async function listRecentActivity(
@@ -59,6 +61,7 @@ export async function listRecentActivity(
 		.select({
 			id: submissions.id,
 			username: users.displayUsername,
+			avatarPath: users.avatarPath,
 			taskLabel: tasks.label,
 			taskKey: submissions.taskKey,
 			at: submissions.createdAt
