@@ -12,6 +12,7 @@
 		"lint": "eslint .",
 		"test": "vitest run",
 		"test:e2e": "playwright test",
+		"test:e2e:smoke": "playwright test --grep @smoke",
 		"test:a11y:full": "node scripts/a11y-full.mjs",
 		"dev:seed": "svelte-kit sync && vite build -c vite.dev-seed.config.ts && node --env-file-if-exists=.env build-scripts-dev/dev-seed.js",
 		"db:push": "drizzle-kit push",

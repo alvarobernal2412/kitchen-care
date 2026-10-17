@@ -243,7 +243,7 @@ test.describe('review queue', () => {
 		expect(await overflow(page)).toEqual([]);
 	});
 
-	test('approve credits the user', async ({ page }) => {
+	test('approve credits the user', { tag: '@smoke' }, async ({ page }) => {
 		const u = await mkUser('rv');
 		const s = await sub(u.id, 'milk');
 		await loginAsAdmin(page);
@@ -257,7 +257,7 @@ test.describe('review queue', () => {
 		await expect(page.getByRole('listitem').filter({ hasText: u.username })).toBeVisible();
 	});
 
-	test('reject needs a reason and records it', async ({ page }) => {
+	test('reject needs a reason and records it', { tag: '@smoke' }, async ({ page }) => {
 		const u = await mkUser('rv');
 		const s = await sub(u.id, 'beans');
 		await loginAsAdmin(page);
@@ -347,7 +347,7 @@ test.describe('users', () => {
 		expect(await overflow(page)).toEqual([]);
 	});
 
-	test('role and active changes need the confirmation step', async ({ page }) => {
+	test('role and active changes need the confirmation step', { tag: '@smoke' }, async ({ page }) => {
 		const u = await mkUser('act');
 		await loginAsAdmin(page);
 		await page.goto(`/admin/users?q=${u.username}`);

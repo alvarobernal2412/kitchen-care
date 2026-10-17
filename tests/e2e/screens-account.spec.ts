@@ -222,7 +222,7 @@ test.describe('login', () => {
 		await expectNoOverflow(page);
 	});
 
-	test('a wrong password shows an inline error tied to the field', async ({ page }) => {
+	test('a wrong password shows an inline error tied to the field', { tag: '@smoke' }, async ({ page }) => {
 		const { username } = await createUser(newName('login'));
 		await page.goto('/login');
 		await page.getByLabel('Username').fill(username);
@@ -270,7 +270,7 @@ test.describe('login', () => {
 	test.describe('without JavaScript', () => {
 		test.use({ javaScriptEnabled: false });
 
-		test('submitting logs in', async ({ page }) => {
+		test('submitting logs in', { tag: '@smoke' }, async ({ page }) => {
 			const { username, password } = await createUser(newName('nojslogin'));
 			await page.goto('/login');
 			await page.getByLabel('Username').fill(username);
@@ -344,7 +344,7 @@ test.describe('signup', () => {
 		await expect(meter.getByText('All rules met')).toBeVisible();
 	});
 
-	test('a taken username shows an inline error tied to the username field', async ({ page }) => {
+	test('a taken username shows an inline error tied to the username field', { tag: '@smoke' }, async ({ page }) => {
 		const { username } = await createUser(newName('taken'));
 		await page.goto('/signup');
 		await page.getByLabel('Username').fill(username);
@@ -602,7 +602,7 @@ test.describe('profile', () => {
 		await adminPage.close();
 	});
 
-	test('Sign out ends the session', async ({ page }) => {
+	test('Sign out ends the session', { tag: '@smoke' }, async ({ page }) => {
 		await signedIn(page);
 		await page.goto('/profile');
 		const out = page.getByRole('main').getByRole('button', { name: 'Sign out' });

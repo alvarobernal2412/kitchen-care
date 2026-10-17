@@ -28,7 +28,7 @@ async function cachedUrls(page: Page): Promise<string[]> {
 }
 
 test.describe('manifest and icons', () => {
-	test('manifest is served as JSON with the required fields', async ({ request }) => {
+	test('manifest is served as JSON with the required fields', { tag: '@smoke' }, async ({ request }) => {
 		const res = await request.get('/manifest.webmanifest');
 		expect(res.status()).toBe(200);
 		expect(res.headers()['content-type']).toMatch(/application\/(manifest\+)?json/);
@@ -82,7 +82,7 @@ test.describe('manifest and icons', () => {
 });
 
 test.describe('service worker', () => {
-	test('controls the page after the first visit and serves the offline page when offline', async ({
+	test('controls the page after the first visit and serves the offline page when offline', { tag: '@smoke' }, async ({
 		page,
 		context
 	}) => {

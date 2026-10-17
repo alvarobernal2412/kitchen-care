@@ -47,6 +47,7 @@ const VIEWPORTS = [
 	{ width: 1280, height: 800 }
 ];
 const FULL = process.env.A11Y_FULL === '1';
+const SMOKE_A11Y = new Set(['login', 'home']);
 /** Pages whose layout differs from the others; these also get the laptop + dark cell by default. */
 const UNIQUE_LAYOUT = new Set(['home', 'leaderboard', 'feed', 'admin review', 'admin analytics', 'profile', 'login']);
 
@@ -105,7 +106,7 @@ for (const scheme of SCHEMES) {
 			test.use({ colorScheme: scheme, viewport, reducedMotion: 'reduce' });
 
 			for (const target of TARGETS.filter((t) => inMatrix(t, scheme, viewport.width))) {
-				test(`${target.name}: no serious or critical axe violations, fits the viewport`, async ({ page }) => {
+				test(`${target.name}: no serious or critical axe violations, fits the viewport`, { tag: scheme === 'light' && SMOKE_A11Y.has(target.name) ? '@smoke' : [] }, async ({ page }) => {
 					await open(page, target);
 					const label = `${target.name} ${scheme} ${viewport.width}`;
 					expect(await overflowReport(page), `${label} overflow`).toEqual([]);

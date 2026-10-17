@@ -106,7 +106,7 @@ async function expectNoOverflow(page: Page) {
 // ------------------------------------------------------------------ Leaderboard
 
 test.describe('leaderboard', () => {
-	test('shows the heading, prize text and the group filter', async ({ page }) => {
+	test('shows the heading, prize text and the group filter', { tag: '@smoke' }, async ({ page }) => {
 		const me = await mkUser('lb-me');
 		await award(me.id, 5);
 		await signIn(page, me);
@@ -490,7 +490,7 @@ test.describe('feed', () => {
 		await expectNoOverflow(page);
 	});
 
-	test('reactions toggle optimistically; your own is distinct by more than colour', async ({
+	test('reactions toggle optimistically; your own is distinct by more than colour', { tag: '@smoke' }, async ({
 		page
 	}) => {
 		const me = await mkUser('f-me');
@@ -604,7 +604,7 @@ test.describe('feed', () => {
 		await expect(article(page, 'Post to be removed')).toHaveCount(0);
 	});
 
-	test('compose posts, clears the box and shows the new post', async ({ page }) => {
+	test('compose posts, clears the box and shows the new post', { tag: '@smoke' }, async ({ page }) => {
 		const me = await mkUser('f-me');
 		await signIn(page, me);
 		await page.goto('/feed');
