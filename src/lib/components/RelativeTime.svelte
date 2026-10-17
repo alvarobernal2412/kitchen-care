@@ -14,6 +14,18 @@
 			timeZone: 'UTC'
 		})
 	);
+	// Hover text: the exact UTC time from the server (so it exists without JavaScript), the viewer's
+	// local time once mounted.
+	const utcTitle = $derived(
+		`${new Date(iso).toLocaleString('en-GB', {
+			day: 'numeric',
+			month: 'short',
+			year: 'numeric',
+			hour: '2-digit',
+			minute: '2-digit',
+			timeZone: 'UTC'
+		})} UTC`
+	);
 	let mounted = $state(false);
 	let now = $state(0);
 	onMount(() => {
@@ -27,7 +39,7 @@
 <time
 	class={className || undefined}
 	datetime={iso}
-	title={mounted ? new Date(iso).toLocaleString() : undefined}
+	title={mounted ? new Date(iso).toLocaleString() : utcTitle}
 >
 	{mounted ? timeAgo(iso, now) : fixed}
 </time>
