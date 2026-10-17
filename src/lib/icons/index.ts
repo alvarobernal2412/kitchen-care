@@ -19,3 +19,5 @@ export { default as IconFlag } from './IconFlag.svelte';
 export { default as IconInbox } from './IconInbox.svelte';
 export { default as IconList } from './IconList.svelte';
 export { default as IconShare } from './IconShare.svelte';
+export { default as IconWarning } from './IconWarning.svelte';
+export { default as IconPulse } from './IconPulse.svelte';
