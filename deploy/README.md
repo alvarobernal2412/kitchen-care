@@ -44,6 +44,12 @@ runner.
 6. In **Uptime Kuma** add an HTTP(s) monitor `https://<DOMAIN>/healthz`, 60 s, status 200 and
    keyword `"ok":true`.
 
+The admin **System** page (Admin > System) complements Uptime Kuma: Kuma tells you the app is up,
+System tells you whether it is healthy (disk, photos, database, container and host memory, load)
+and which commit is deployed (`GIT_SHA` build arg, passed by `update.sh`). It is read-only and
+cannot see backups. Its Attention / Critical thresholds are constants in
+`src/lib/server/system/thresholds.ts`.
+
 ## Registering the runner
 
 The deploy job runs on a repo-scoped, **ephemeral** self-hosted runner that lives in a container

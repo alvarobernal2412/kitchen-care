@@ -128,6 +128,19 @@ The service worker and manifest are active in production builds. On Android Chro
 "Install app"; on iOS Safari use Share, then "Add to Home Screen". Icons are regenerated with
 `node scripts/generate-icons.mjs`.
 
+## System page (admin)
+
+Admin > System is a read-only health page for the owner: an overall OK / Attention / Critical
+status with reasons, then disk (the VPS filesystem holding the photos), photos (count and size,
+cached for 60 s), database (size, largest tables, connections, round-trip time), the app process
+(version, memory, container memory from cgroups, event-loop delay) and the VPS host (available
+memory, load), plus activity counters. Attention / Critical: disk free < 20% or 10 GB / < 10% or
+5 GB; photos > 2 / 5 GB; DB connections > 70% / 90% of max or response > 250 ms / 1 s (or
+unreachable); container memory >= 75% / 90% of its limit; event-loop p99 > 200 ms / 1 s; host
+memory available < 600 / 300 MB; 5-min load > 1.5x / 3x the CPUs. The limits are in
+`src/lib/server/system/thresholds.ts`. The shown version is the `APP_VERSION` set from the
+`GIT_SHA` build arg (`deploy/update.sh` passes the deployed commit; `dev` otherwise).
+
 ## Deployment
 
 Production runs as a Docker stack behind an existing Nginx Proxy Manager on a VPS, deployed by
