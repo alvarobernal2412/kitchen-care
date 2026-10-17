@@ -212,6 +212,8 @@
 		padding: var(--sp-2) var(--gutter);
 		overflow-x: auto;
 		scroll-snap-type: x proximity;
+		/* a focused tab scrolls into view clear of the edge, so its focus ring is not clipped */
+		scroll-padding-inline: var(--gutter);
 		background: var(--surface);
 		border-bottom: 1px solid var(--line);
 		scrollbar-width: none;
