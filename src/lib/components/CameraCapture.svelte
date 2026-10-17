@@ -323,7 +323,9 @@
 		align-items: center;
 		justify-content: space-between;
 		gap: var(--sp-3);
-		padding: var(--sp-4) max(var(--gutter), env(safe-area-inset-right, 0px));
+		padding-block: var(--sp-4);
+		padding-inline: max(var(--gutter), env(safe-area-inset-left, 0px))
+			max(var(--gutter), env(safe-area-inset-right, 0px));
 		padding-bottom: calc(var(--sp-4) + env(safe-area-inset-bottom, 0px));
 		background: var(--cam-bar);
 		border-top: 1px solid var(--cam-line);
