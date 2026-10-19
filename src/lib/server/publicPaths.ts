@@ -3,6 +3,7 @@
 // exact match fails closed (anonymous visitors get sent to /login), which is always safe.
 const EXACT = new Set([
 	'/login',
+	'/privacy',
 	'/signup',
 	'/reset-password',
 	'/logout',
