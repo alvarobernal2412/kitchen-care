@@ -1,7 +1,5 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-
-	let { data } = $props();
 </script>
 
 <svelte:head><title>Privacy notice</title></svelte:head>
@@ -63,9 +61,7 @@
 	</p>
 
 	<h2>Contact</h2>
-	<p>
-		{#if data.contact}{data.contact}{:else}Ask the administrators of this site.{/if}
-	</p>
+	<p>Ask the administrators of this site.</p>
 </main>
 
 <style>
