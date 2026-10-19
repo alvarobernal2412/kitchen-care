@@ -1,6 +1,8 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { z } from 'zod';
 import { changePassword, changeUsername } from '$lib/server/auth/account';
+import { clearSessionCookie } from '$lib/server/auth/cookie';
+import { LastAdminError, eraseAccount } from '$lib/server/auth/erase';
 import { SESSION_COOKIE } from '$lib/server/auth/session';
 import { AuthError } from '$lib/server/auth/users';
 import { getDb } from '$lib/server/db';
@@ -91,5 +93,26 @@ export const actions: Actions = {
 			throw err;
 		}
 		return { passwordChanged: true };
+	},
+	deleteAccount: async ({ request, locals, cookies }) => {
+		const user = locals.user;
+		if (!user) return fail(401, { deleteError: 'Sign in required' });
+		if (!hit(`erase:${user.id}`, 5, 15 * 60 * 1000)) {
+			return fail(429, { deleteError: 'Too many attempts. Try again in a few minutes.' });
+		}
+		const data = Object.fromEntries(await request.formData());
+		const password = typeof data.password === 'string' ? data.password.slice(0, 256) : '';
+		if (!password) return fail(400, { deleteError: 'Enter your password.' });
+		if (data.confirm !== 'yes') return fail(400, { deleteError: 'Tick the box to confirm.' });
+		try {
+			await eraseAccount(getDb(), user.id, password);
+		} catch (err) {
+			if (err instanceof AuthError || err instanceof LastAdminError) {
+				return fail(400, { deleteError: err.message });
+			}
+			throw err;
+		}
+		clearSessionCookie(cookies);
+		redirect(303, '/login?deleted=1');
 	}
 };
