@@ -47,10 +47,16 @@ test('an expired session during client-side navigation lands on /login without a
 
 	await dropSessions(username); // as if it had expired
 
-	const dataResponse = page.waitForResponse((r) => r.url().includes('/leaderboard/__data.json'));
+	// Read the body inside the route: once the redirect navigates away, the browser discards it.
+	let payload: unknown;
+	await page.route('**/leaderboard/__data.json*', async (route) => {
+		const response = await route.fetch();
+		payload = await response.json();
+		await route.fulfill({ response });
+	});
 	await page.getByRole('link', { name: 'Leaderboard' }).click();
-	expect(await (await dataResponse).json()).toMatchObject({ type: 'redirect', location: '/login' });
 	await expect(page).toHaveURL(`${E2E_ORIGIN}/login`);
+	expect(payload).toMatchObject({ type: 'redirect', location: '/login' });
 	await expect(page.getByRole('button', { name: 'Log in' })).toBeVisible();
 	await expect(page.getByText(/internal error|500/i)).toHaveCount(0);
 });
