@@ -25,6 +25,7 @@
 	let usernameDraft = $state(form?.username ?? data.profile.username);
 	const nameErrorField = $derived(form?.usernameError ? form.usernameField : null);
 	let pwBusy = $state(false);
+	let deleteBusy = $state(false);
 
 	let blob = $state.raw<Blob | null>(null);
 	let previewUrl = $state<string | null>(null);
@@ -327,6 +328,49 @@
 		</section>
 	{/if}
 
+	<section aria-labelledby="data-h">
+		<h2 id="data-h">Your data</h2>
+		<p class="note">
+			Read how we use your data in the <a href={resolve('/privacy')}>privacy notice</a>.
+		</p>
+		<p><a class="btn btn-quiet" href={resolve('/profile/export')} download>Download my data</a></p>
+		<details class="danger">
+			<summary>Delete my account</summary>
+			<p class="note">
+				This removes your photo, posts, comments and reactions and cannot be undone. Your points stay
+				in past results under the name “Deleted user”.
+			</p>
+			<form
+				method="POST"
+				action="?/deleteAccount"
+				use:enhance={() => {
+					deleteBusy = true;
+					return async ({ update }) => {
+						await update({ reset: false });
+						deleteBusy = false;
+					};
+				}}
+			>
+				<div class="field">
+					<label class="label" for="deletePassword">Password</label>
+					<input
+						id="deletePassword"
+						class="input"
+						type="password"
+						name="password"
+						autocomplete="current-password"
+						required
+					/>
+				</div>
+				<label class="check"><input type="checkbox" name="confirm" value="yes" required /> I understand this is permanent</label>
+				{#if form?.deleteError}<p id="delete-error" class="error" role="alert">{form.deleteError}</p>{/if}
+				<button type="submit" class="btn btn-primary btn-block" disabled={deleteBusy} aria-busy={deleteBusy}>
+					Delete my account
+				</button>
+			</form>
+		</details>
+	</section>
+
 	<section>
 		<form method="POST" action="/logout">
 			<button type="submit" class="btn btn-quiet signout">Sign out</button>
@@ -335,6 +379,28 @@
 </div>
 
 <style>
+	.danger {
+		margin-top: var(--sp-3);
+	}
+	.danger summary {
+		min-height: 44px;
+		display: flex;
+		align-items: center;
+		cursor: pointer;
+		color: var(--muted);
+	}
+	.danger form {
+		display: flex;
+		flex-direction: column;
+		gap: var(--sp-4);
+		margin-top: var(--sp-3);
+	}
+	.check {
+		display: flex;
+		align-items: center;
+		gap: var(--sp-2);
+		min-height: 44px;
+	}
 	.page {
 		padding: var(--sp-5) 0 var(--sp-6);
 	}
