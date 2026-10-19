@@ -14,8 +14,9 @@ const schema = z.object({
 	password: z.string().min(1, 'Enter your password').max(256)
 });
 
-export const load: PageServerLoad = ({ locals }) => {
+export const load: PageServerLoad = ({ locals, url }) => {
 	if (locals.user) redirect(303, '/');
+	return { deleted: url.searchParams.get('deleted') === '1' };
 };
 
 export const actions: Actions = {

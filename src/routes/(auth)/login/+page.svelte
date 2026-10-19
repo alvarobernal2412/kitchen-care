@@ -2,7 +2,7 @@
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
 
-	let { form } = $props();
+	let { data, form } = $props();
 	// Only set by the enhanced submit, so the server-rendered button is always enabled.
 	let busy = $state(false);
 
@@ -14,6 +14,7 @@
 
 <h1>Log in</h1>
 <p class="slogan">Good karma pays out: Rack up your credits for this semester's grand reward.</p>
+{#if data.deleted}<p class="slogan" role="status">Your account was deleted.</p>{/if}
 
 <form
 	method="POST"
@@ -62,3 +63,4 @@
 </form>
 
 <p class="alt">New here? <a href={resolve('/signup')}>Create an account</a></p>
+<p class="alt"><a href={resolve('/privacy')}>Privacy notice</a></p>

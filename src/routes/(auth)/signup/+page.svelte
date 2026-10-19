@@ -131,6 +131,7 @@
 </form>
 
 <p class="alt">Already have an account? <a href={resolve('/login')}>Log in</a></p>
+<p class="alt legal">By signing up you agree to the processing described in the <a href={resolve('/privacy')}>privacy notice</a>.</p>
 
 <style>
 	.offer {
