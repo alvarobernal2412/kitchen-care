@@ -26,8 +26,7 @@ get it. `WELCOME_BONUS_UNTIL` (ISO-8601 with offset, see `.env.example`) moves o
 
 ## Privacy and personal data
 
-The public `/privacy` page is the privacy notice; `PRIVACY_CONTACT` (see `.env.example`) sets the
-contact line it shows. Under Profile > Your data, users can download their data as JSON and delete
+The public `/privacy` page is the privacy notice; it points users to the site administrators. Under Profile > Your data, users can download their data as JSON and delete
 their account. Deletion removes the photo, posts, comments, reactions, sessions and proof images and
 turns the user into an inactive "Deleted user"; points stay in past results. The last active admin
 cannot delete their account.
