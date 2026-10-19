@@ -5,6 +5,7 @@ const cases: [string, boolean][] = [
 	['/login', true],
 	['/login/', true],
 	['/signup', true],
+	['/privacy', true],
 	['/reset-password', true],
 	['/logout', true],
 	['/healthz', true],

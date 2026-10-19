@@ -30,6 +30,7 @@ x-app: &app
     APP_TIMEZONE: ${APP_TIMEZONE:?set APP_TIMEZONE in .env}
     # Optional; empty means the built-in default (see .env.example).
     WELCOME_BONUS_UNTIL: ${WELCOME_BONUS_UNTIL:-}
+    PRIVACY_CONTACT: ${PRIVACY_CONTACT:-}
     SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET in .env}
     DATABASE_URL: postgres://kitchen:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/kitchen
     NODE_OPTIONS: --max-old-space-size=288
